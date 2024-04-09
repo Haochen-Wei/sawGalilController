@@ -12,6 +12,7 @@ The component is designed to be generic, and is configured using both JSON and D
 The JSON file specifies the high-level configuration data, such as the controller connectivity information
 and conversions between controller units (e.g., encoder counts) and SI units.
 The DMC file handles the low-level Galil configuration. Note that the DMC filename is specified in
-the JSON file.
+the JSON file. Examples of JSON and DMC files can be found in the [share](./core/share) subdirectory,
+with the JSON file format documented in the corresponding [README](./core/share/README.md).
 
-Most of the source code is in the `core` subdirectory to facilitate building with ROS1 or ROS2.
+Most of the source code is in the [core](./core) subdirectory to facilitate building with ROS1 or ROS2.
