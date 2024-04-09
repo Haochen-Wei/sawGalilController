@@ -427,8 +427,9 @@ void mtsGalilController::Startup()
 
     // Store the current setting of limit disable (LD) in mLimitDisable
     mLimitDisable.SetAll(0);
-    if (!QueryCmdValues("LD ", mGalilQuery, mLimitDisable))
+    if (!QueryCmdValues("LD ", mGalilQuery, mLimitDisable)) {
         CMN_LOG_CLASS_INIT_ERROR << "Startup: Could not query limit disable (LD)" << std::endl;
+    }
     // Update mHomeLimitDisable based on mLimitDisable
     for (size_t i = 0; i < mNumAxes; i++)
         mHomeLimitDisable[i] |= mLimitDisable[i];
@@ -637,7 +638,7 @@ char *mtsGalilController::WriteCmdValues(char *buf, const char *cmd, const int32
     size_t len = strlen(buf);
     for (unsigned int i = 0; i < num; i++) {
         if (valid[i]) {
-            sprintf(buf+len, "%ld,", data[i]);
+            sprintf(buf+len, "%d,", data[i]);
             len = strlen(buf);
         }
         else {
