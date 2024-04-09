@@ -9,7 +9,7 @@
     "axes": [
         {
             "index": 0,
-            "type": 1,                       // Prismatic
+            "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 64385387           // 64391387-6000
@@ -17,7 +17,7 @@
         },
         {
             "index": 1,
-            "type": 1,                       // Prismatic
+            "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 65644013           // 65650013-6000
@@ -25,7 +25,7 @@
         },
         {
             "index": 2,
-            "type": 1,                       // Prismatic
+            "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 66229792           // 66235792-6000
@@ -33,7 +33,7 @@
         },
         {
             "index": 4,
-            "type": 2,                       // Revolute
+            "type": "REVOLUTE",
             "position_bits_to_SI": {
                 "scale":  41721.64072584,    // 728.18*180/PI
                 "offset": 123094
@@ -41,7 +41,7 @@
         },
         {
             "index": 5,
-            "type": 1,                       // Prismatic
+            "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 63548117
