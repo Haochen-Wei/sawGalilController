@@ -1,0 +1,4 @@
+{
+  "name": "sawGalilControllerCore",
+  "dependencies": ["cisst"]
+}

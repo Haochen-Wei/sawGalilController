@@ -1,0 +1,54 @@
+// XYZ Stages for FLASH system, using Galil DMC-4143
+// Pittman 14204S005 motor: 24V, max continuous current: 3.7A
+//                          torque const: 8.67 oz-in/A
+// Dover XYR-6060: 100mm x 100mm, 2mm lead-screw, encoder with 2000 counts/rev
+// Dover LM-200: 2in (50.8mm), 2mm lead-screw, encoder with 2000 counts/rev
+//    2000 counts/rev * (1/2) rev/mm --> 1000 counts/mm --> 1000000 counts/m
+{
+    "file_version": 1,
+    "name": "FlashXYZ",
+    "IP_address": "169.254.0.51",
+    "direct_mode": 1,
+    "DMC_file": "FlashXYZ.dmc",
+    "axes": [
+        {
+            "index": 0,
+            "type": 1,                  // Prismatic
+            "position_bits_to_SI": {
+                "scale":  1000000,
+                "offset": 0
+            },
+            "home_pos":  -0.05,
+            "position_limits": {
+                "lower": -0.05,
+                "upper":  0.05
+            }
+        },
+        {
+            "index": 1,
+            "type": 1,                  // Prismatic
+            "position_bits_to_SI": {
+                "scale":  1000000,
+                "offset": 0
+            },
+            "home_pos":  -0.05,
+            "position_limits": {
+                "lower": -0.05,
+                "upper":  0.05
+            }
+        },
+        {
+            "index": 2,
+            "type": 1,                  // Prismatic
+            "position_bits_to_SI": {
+                "scale":  1000000,
+                "offset": 0
+            },
+            "home_pos":  -0.0254,
+            "position_limits": {
+                "lower": -0.0254,
+                "upper":  0.0254
+            }
+        }
+    ]
+}

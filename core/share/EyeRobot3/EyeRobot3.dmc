@@ -1,0 +1,132 @@
+#LOADSET
+
+'ENSURE BRAKES ARE SET (just for checking currently
+REM JS BRKON
+CB1
+CB2
+CB3
+
+'ZERO AXIS E, TODO-REPLACE THIS, MAKE DUAL VELOCITY WORK BETTER HERE!
+REM DPE=0
+REM 
+'Configure Motors, Amps, Torque limits
+MT-1,-1,-1,0,-1,-1; 'TODO CHECK E AND F AXES
+CE2,2,2,0,2,2; 'normal quadrature =0 for Abs encoders and reverse quad for absolute encoders
+BR1,1,1,1,1,1;
+OF2,0,3
+
+'TURN ON MOTORS
+REM JS INITMOT
+
+'Setup Absolute Encoders with BiSS
+REM JS INITENC
+SSA=2,27,0,0<9
+SSB=2,27,0,0<9
+SSC=2,27,0,0<9
+SSE=2,19,0,0<9
+SSF=2,27,0,0<9
+SY0,0,0,,0,0;
+
+'abs encoders and limits
+DV1,1,1,0,1,1; ' Set up dual velocity
+DF1,1,1,0,1,1; ' Switch the abs encoders to be main (used for limits)
+OE1,1,1,0,1,1; 'Shutdown by position error, amp error or abort inputs - TODO: Tune this better with 1
+REM OE2,2,2,0,2,2;
+REM ER4000,4000,4000,16384,4000,4000,16384,16384; ' in terms of abs encoder counts because this was swapped via DF. Set the levels for this, slightly higher than end limit switch distances ' if passes -. MO, turn on now new ref
+ER14000,14000,14000,36384,14000,14000,36384,36384;
+
+'Configure Amps
+AG0,0,0,0,0,0; ' 2 sets voltage gain for internal amp at 1V, 1 sets to 0.7 V, 0 sets for 0.4 V
+AU0,0,0,0,0,0; ' Default for 3040 amp, all motor inductances (L) between 0.5 and 10 mH
+
+'Configure Torque limits
+TL	1.63,1.63,1.63,0,0.4275,1.63
+TK	7.75,7.75,7.75,0,1.402,7.75
+REM OLD TORQUE LIMITS:
+REM TL6,6,6,0,3.75,2.925; 'TODO COMPUTE: TL limit 7, TODO: Check E and F
+REM TK 9.999,9.999,9.999,0,6.25,5.0; 'TODO COMPUTE: set after amp gain 
+
+'Speeds/Accel/Decel Values
+LD0,0,0,3,3,0,3,3; '0-all switches enabled, 3-disabled
+SD2000000,2000000,2000000,0,4000000,8000000,0,0;'Limit switch decelration
+HV1000,1000,1000,0,2000,10000,0,0;'Homing velocities
+AC7500000,7500000,7500000,0,4000000,8000000,0,0;'accelerations and decelerations
+DC7500000,7500000,7500000,0,4000000,8000000,0,0;
+SP50000,50000,50000,0,50000, 50000,0,0;'Speeds
+REM SP4800,4800,4800,0,1700, 1700,0,0;'Speeds, 4800 ~ 1mm/s
+
+'Software Limits
+REM FL64505635,65764359,66352128,,194145,63566560; 'added 100 to A,B,C,,E,F axes
+REM BL64192996,65456784,66039656,,61331,63365910; 'subtracted 100 from A,B,C,,E,F axes
+REM FL64505635,65764359,66352128,,2147483647,63566560; 'added 100 to A,B,C,,E,F axes
+REM BL64192996,65456784,66039656,,-2147483647,63365910; 'subtracted 100 from A,B,C,,E,F axes
+FL64605635,65864359,66452128,,2147483647,63666560; 'added 100 to A,B,C,,E,F axes - Added by David (removing motor turn off error) 1/12/23
+BL64092996,65356784,65939656,,-2147483647,63265910; 'subtracted 100 from A,B,C,,E,F axes- Added by David (removing motor turn off error) 1/12/23
+REM ADD LIMIT +- ~720000 FOR E AXIS IF NOT USING LIMIT SWITCHES AND ABS ENCODER...MUST ZERO AXIS THOUGH
+
+'PID/Tuning Values 
+KP6,6,6,0,6,6,0,0
+KD64,64,64,0,64,64,0,0
+KI0.0039,0.0039,0.0039,0,0.0039,0.0039,0,0
+' KP100,100,100,0,300,42,0,0;'TODO: TUNE -> how to do this?
+' KD400,300,300,0,1000,318,0,0;'TODO: TUNE -> how to do this?
+' KI2,2,2,0,3,2,0,0;'TODO: TUNE -> how to do this?
+IL9.9982,9.9982,9.9982,0,9.9982,9.9982,0,0;
+' FA5,6,6,0,3,1,0,0;'TODO: TUNE -> how to do this?
+' FV4,3,8,0,6,1,0,0;'TODO: TUNE -> how to do this?
+REM PL0,0.1,0.1,0,0,0,0,0;'TODO: TUNE -> how to do this?
+
+
+AQ1,2;
+AQ2,2;
+AQ3,2;
+AQ4,2;
+AQ5,2;
+AQ6,2;
+AQ7,2;
+AQ8,2;
+
+EN
+
+#INITENC
+SSA=2,27,0,0<9
+SSB=2,27,0,0<9
+SSC=2,27,0,0<9
+SSE=2,19,0,0<9
+SSF=2,27,0,0<9
+SY0,0,0,,0,0;
+EN
+
+REM #INITMOT
+REM SH ABCEF;
+REM EN
+
+REM #BRKON
+REM CB1
+REM CB2
+REM CB3
+REM EN
+REM 
+REM #BRKOFF
+REM SB1
+REM SB2
+REM SB3
+REM EN
+REM 
+REM #AMPERR
+REM MG "amplifier fault"
+REM MG _TA0,_TA1,_TA2,_TA3
+REM EN
+
+REM #POSERR
+REM MG "position error fault"
+REM MG _TEA,_TEB,_TEC,_TEE,_TEF
+REM EN
+
+#LIMSWI; 'Code called when forward or reverse limit switch activated
+ST
+MG "limit switch fault","limit switch fault"
+MG _TSA,_TSB,_TSC,_TSE,_TSF
+
+
+EN

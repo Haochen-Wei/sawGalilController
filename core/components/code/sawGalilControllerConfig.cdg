@@ -1,0 +1,185 @@
+// -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+// ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab:
+
+inline-header {
+#include <set>
+#include <limits>
+#include <cisstCommon/cmnUnits.h>
+#include <cisstParameterTypes/prmJointType.h>
+#include <sawGalilController/sawGalilControllerRevision.h>
+#include <sawGalilController/sawGalilControllerExport.h>
+
+namespace sawGalilControllerConfig {
+
+    inline bool unit_is_distance(const std::string & unit) {
+        // make sure this is properly sorted
+        static const std::set<std::string> keywords {"cm", "deg", "m", "mm", "rad"};
+        return keywords.find(unit) != keywords.end();
+    }
+
+    inline bool unit_is_distance_revolute(const std::string & unit) {
+        // make sure this is properly sorted
+        static const std::set<std::string> keywords {"deg", "rad"};
+        return keywords.find(unit) != keywords.end();
+    }
+
+    inline bool unit_is_distance_prismatic(const std::string & unit) {
+        // make sure this is properly sorted
+        static const std::set<std::string> keywords {"cm", "m", "mm"};
+        return keywords.find(unit) != keywords.end();
+    }
+
+    inline double unit_to_SI_factor(const std::string & unit) {
+        // make sure this is properly sorted
+        static const std::map<std::string, double> factors {
+            { "A",   1.0},
+            { "cm",  cmn_cm},
+            { "deg", cmnPI_180},
+            { "m",   cmn_m},
+            { "mA",  1.000},
+            { "mm",  cmn_mm},
+            { "rad", 1.0},
+            { "none", 1.0}
+        };
+        const auto factor = factors.find(unit);
+        if (factor != factors.end()) {
+            return factor->second;
+        }
+        return 0.0;
+    }
+} // namespace sawGalilControllerConfig
+
+} // inline-header
+
+class {
+    name linear_function;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name scale;
+        type double;
+        default 1.0;
+        visibility public;
+    }
+    member {
+        name offset;
+        type double;
+        default 0.0;
+        visibility public;
+    }
+    member {
+        name unit;
+        type std::string;
+        default std::string("none");
+        visibility public;
+    }
+}
+
+class {
+    name limits;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name lower;
+        type double;
+        default -std::numeric_limits<double>::max();
+        visibility public;
+    }
+    member {
+        name upper;
+        type double;
+        default std::numeric_limits<double>::max();
+        visibility public;
+    }
+    member {
+        name unit;
+        type std::string;
+        default std::string("none");
+        visibility public;
+    }
+}
+
+class {
+    name axis;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name index;
+        type size_t;
+        visibility public;
+    }
+    member {
+        name type;
+        type prmJointType;
+        visibility public;
+    }
+    member {
+        name position_bits_to_SI;
+        type sawGalilControllerConfig::linear_function;
+        visibility public;
+    }
+    member {
+        name home_pos;
+        type double;
+        default 0.0;
+        visibility public;
+    }
+    member {
+        name position_limits;
+        type sawGalilControllerConfig::limits;
+        default sawGalilControllerConfig::limits();
+        visibility public;
+    }
+}
+
+class {
+    name controller;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+
+    member {
+        name file_version;
+        type int;
+        visibility public;
+    }
+    member {
+        name name;
+        type std::string;
+        visibility public;
+    }
+    member {
+        name IP_address;
+        type std::string;
+        default std::string("auto");
+        visibility public;
+    }
+    member {
+        name direct_mode;
+        type bool;
+        default false;
+        visibility public;
+    }
+    member {
+        name model;
+        type unsigned int;
+        default 0;
+        visibility public;
+    }
+    member {
+        name DR_period_ms;
+        type int;
+        default 2;
+        visibility public;
+    }
+    member {
+        name DMC_file;
+        type std::string;
+        default std::string("");
+        visibility public;
+    }
+    member {
+        name axes;
+        type std::vector<sawGalilControllerConfig::axis>;
+        visibility public;
+    }
+}

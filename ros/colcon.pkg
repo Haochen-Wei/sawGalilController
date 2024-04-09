@@ -1,0 +1,4 @@
+{
+  "name": "galil_controller",
+  "dependencies": ["cisst_ros_crtk", "sawGalilControllerCore"]
+}

@@ -1,0 +1,51 @@
+// Eye Robot 3.0
+// position_bits_to_SI.offset is the offset, in bits
+{
+    "file_version": 1,
+    "name": "EyeRobot3.0",
+    "IP_address": "192.168.0.158",
+    "direct_mode": 1,
+    "DMC_file": "EyeRobot3.dmc",             // Was EYE_ROB3_CONFIG_SCRIPT.dmc
+    "axes": [
+        {
+            "index": 0,
+            "type": 1,                       // Prismatic
+            "position_bits_to_SI": {
+                "scale":  4096000,
+                "offset": 64385387           // 64391387-6000
+            }
+        },
+        {
+            "index": 1,
+            "type": 1,                       // Prismatic
+            "position_bits_to_SI": {
+                "scale":  4096000,
+                "offset": 65644013           // 65650013-6000
+            }
+        },
+        {
+            "index": 2,
+            "type": 1,                       // Prismatic
+            "position_bits_to_SI": {
+                "scale":  4096000,
+                "offset": 66229792           // 66235792-6000
+            }
+        },
+        {
+            "index": 4,
+            "type": 2,                       // Revolute
+            "position_bits_to_SI": {
+                "scale":  41721.64072584,    // 728.18*180/PI
+                "offset": 123094
+            }
+        },
+        {
+            "index": 5,
+            "type": 1,                       // Prismatic
+            "position_bits_to_SI": {
+                "scale":  4096000,
+                "offset": 63548117
+            }
+        }
+    ]
+}

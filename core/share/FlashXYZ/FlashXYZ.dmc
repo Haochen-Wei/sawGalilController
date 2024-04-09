@@ -1,0 +1,5 @@
+REM Settings for FLASH XYZ stage with Pittman motors, using Galil DMC-2143 with AMP-43040
+MO;                  ' Ensure that motors are off
+BR 1,1,1;            ' Brush motors
+AG 0,0,0;            ' Amplifier gain (0=0.4A/V, 1=0.7A/V, 2=1.0A/V)
+AU 0,0,0;            ' Amplifier current loop gain (default)
