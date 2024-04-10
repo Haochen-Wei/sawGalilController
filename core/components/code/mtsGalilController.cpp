@@ -379,6 +379,8 @@ void mtsGalilController::Configure(const std::string& fileName)
     mGalilAxes[k] = 0;           // NULL termination
     mGalilQuery[q-1] = 0;        // NULL termination (and remove last comma)
 
+    m_op_state.SetIsHomed(mActuatorState.IsHomed().All());
+
     // Default values should be read from JSON file
     mSpeedDefault.SetAll(0.025);   // 25 mm/s
     mAccelDefault.SetAll(0.256);   // 256 mm/s^2
@@ -569,6 +571,7 @@ void mtsGalilController::Run()
                 //       to update the home state.
                 //  TODO: could at least query ZA on startup for systems that do not support
                 //        it in the data record (DR).
+                //  TODO: remove following code and only query ZA on startup
                 if (mEncoderAbsolute[i]) {
                     mActuatorState.IsHomed()[i] = true;
                 }
@@ -624,6 +627,7 @@ void mtsGalilController::Run()
         if (mStopCode.Equal(SC_Homing)) {
             SetHomePosition(mHomePos);
             mActuatorState.IsHomed().SetAll(true);
+            m_op_state.SetIsHomed(true);
             if (!galil_cmd_common("home (LD-restore)", "LD ", mLimitDisable))
                mInterface->SendError("Home: failed to restore limits");
             mInterface->SendStatus(this->GetName() + ": finished homing");
@@ -932,6 +936,7 @@ void mtsGalilController::UnHome(const vctBoolVec &mask)
     for (unsigned int i = 0; i < mGalilIndexMax; i++)
         galilData[i] = 0;
     SendCommand(WriteCmdValues(mBuffer, "ZA ", galilData, galilIndexValid, mGalilIndexMax));
+    m_op_state.SetIsHomed(false);
 }
 
 void mtsGalilController::FindEdge(const vctBoolVec &mask)
