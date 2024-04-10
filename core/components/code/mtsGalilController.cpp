@@ -2,6 +2,8 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
+  Author(s): Peter Kazanzides, Dimitri Lezcano, Anton Deguet
+
   (C) Copyright 2024 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
@@ -315,6 +317,7 @@ void mtsGalilController::Configure(const std::string& fileName)
     mGalilIndexToAxisMap.SetAll(mNumAxes);   // Initialize to invalid value
     mEncoderCountsPerUnit.SetSize(mNumAxes);
     mEncoderOffset.SetSize(mNumAxes);
+    mEncoderAbsolute.SetSize(mNumAxes);
     mHomePos.SetSize(mNumAxes);
     mHomeLimitDisable.SetSize(mNumAxes);
     mLimitDisable.SetSize(mNumAxes);
@@ -351,6 +354,8 @@ void mtsGalilController::Configure(const std::string& fileName)
         m_config_j.PositionMax()[axis] = axisData.position_limits.upper;
         mEncoderCountsPerUnit[axis] = axisData.position_bits_to_SI.scale;
         mEncoderOffset[axis] = static_cast<long>(axisData.position_bits_to_SI.offset);
+        mEncoderAbsolute[axis] = axisData.is_absolute;
+        mActuatorState.IsHomed()[axis] = axisData.is_absolute;
         mHomePos[axis] = axisData.home_pos;
         mHomeLimitDisable[axis] = 0;
         if (axisData.home_pos <= axisData.position_limits.lower)
@@ -557,11 +562,18 @@ void mtsGalilController::Run()
                 mActuatorState.HardFwdLimitHit()[i] = mSwitches[i] & SwitchFwdLimit;
                 mActuatorState.HardRevLimitHit()[i] = mSwitches[i] & SwitchRevLimit;
                 mActuatorState.HomeSwitchOn()[i]    = mSwitches[i] & SwitchHome;
-                if (AxisDataSize[mModel] == ADmax) {
-                    mActuatorState.IsHomed()[i] = reinterpret_cast<AxisDataMax *>(axisPtr)->var;
+                // Set home state:
+                //   - Absolute encoder: always homed
+                //   - Incremental encoder: if controller supports the user "var" (ZA) field,
+                //       then we can read it; otherwise, we rely on the home/unhome commands
+                //       to update the home state.
+                //  TODO: could at least query ZA on startup for systems that do not support
+                //        it in the data record (DR).
+                if (mEncoderAbsolute[i]) {
+                    mActuatorState.IsHomed()[i] = true;
                 }
-                else {
-                    // Probably look at a cached version of IsHomed
+                else if (AxisDataSize[mModel] == ADmax) {
+                    mActuatorState.IsHomed()[i] = reinterpret_cast<AxisDataMax *>(axisPtr)->var;
                 }
             }
             // TODO: check following logic
@@ -608,8 +620,10 @@ void mtsGalilController::Run()
         break;
 
     case ST_HOMING:
+        // TODO: this implementation assumes that all axes are being homed
         if (mStopCode.Equal(SC_Homing)) {
             SetHomePosition(mHomePos);
+            mActuatorState.IsHomed().SetAll(true);
             if (!galil_cmd_common("home (LD-restore)", "LD ", mLimitDisable))
                mInterface->SendError("Home: failed to restore limits");
             mInterface->SendStatus(this->GetName() + ": finished homing");

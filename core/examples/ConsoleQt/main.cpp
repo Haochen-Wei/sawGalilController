@@ -3,7 +3,6 @@
 
 /*
   Author(s):  Anton Deguet
-  Created on: 2014-02-28
 
   (C) Copyright 2024 Johns Hopkins University (JHU), All Rights Reserved.
 

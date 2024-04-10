@@ -119,6 +119,12 @@ class {
         visibility public;
     }
     member {
+        name is_absolute;
+        type bool;
+        default false;
+        visibility public;
+    }
+    member {
         name home_pos;
         type double;
         default 0.0;

@@ -2,6 +2,8 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
+  Author(s): Peter Kazanzides, Dimitri Lezcano, Anton Deguet
+
   (C) Copyright 2024 Johns Hopkins University (JHU), All Rights Reserved.
 
   This component provides an interface to a Galil DMC controller, using the DR
@@ -88,6 +90,7 @@ protected:
     vctUIntVec    mGalilIndexToAxisMap;     // Map from Galil index to axis number
     vctDoubleVec  mEncoderCountsPerUnit;    // Encoder conversion factors
     vctLongVec    mEncoderOffset;           // Encoder offset (counts or bits)
+    vctBoolVec    mEncoderAbsolute;         // True if absolute encoder (false if incremental)
     vctDoubleVec  mHomePos;                 // Encoder home positions (offsets)
     vctIntVec     mHomeLimitDisable;        // Limit switch disable during homing
     vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)

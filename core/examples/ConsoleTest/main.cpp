@@ -2,7 +2,9 @@
 /*ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab:*/
 
 /*
-(C) Copyright 2024 Johns Hopkins University (JHU), All Rights Reserved.
+  Author(s): Peter Kazanzides
+
+  (C) Copyright 2024 Johns Hopkins University (JHU), All Rights Reserved.
 
 --- begin cisst license - do not edit ---
 

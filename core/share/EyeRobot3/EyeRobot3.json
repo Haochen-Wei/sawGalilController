@@ -13,7 +13,8 @@
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 64385387           // 64391387-6000
-            }
+            },
+	    "is_absolute": 1
         },
         {
             "index": 1,
@@ -21,7 +22,8 @@
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 65644013           // 65650013-6000
-            }
+            },
+	    "is_absolute": 1
         },
         {
             "index": 2,
@@ -29,7 +31,8 @@
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 66229792           // 66235792-6000
-            }
+            },
+	    "is_absolute": 1
         },
         {
             "index": 4,
@@ -37,7 +40,8 @@
             "position_bits_to_SI": {
                 "scale":  41721.64072584,    // 728.18*180/PI
                 "offset": 123094
-            }
+            },
+	    "is_absolute": 1
         },
         {
             "index": 5,
@@ -45,7 +49,8 @@
             "position_bits_to_SI": {
                 "scale":  4096000,
                 "offset": 63548117
-            }
+            },
+	    "is_absolute": 1
         }
     ]
 }

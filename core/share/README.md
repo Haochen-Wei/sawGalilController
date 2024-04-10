@@ -23,6 +23,7 @@ The JSON file contains the following fields:
 |  - position_bits_to_SI |  | - conversion scale and offset (*)              |
 |  -- scale    | 1         | -- scale factor                                 |
 |  -- offset   | 0         | -- offset (in bits)                             |
+|  - is_absolute | false   | - true if absolute encoder (false if incremental) |
 |  - home_pos  | 0         | - home position                                 |
 |  - position_limits |     | - upper and lower joint position limits         |
 |  -- lower    | -MAX      | -- lower position limit                         |
