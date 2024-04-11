@@ -94,6 +94,8 @@ protected:
     vctDoubleVec  mHomePos;                 // Encoder home positions (offsets)
     vctIntVec     mHomeLimitDisable;        // Limit switch disable during homing
     vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
+    bool          mLimitSwitchActiveLow;    // Limit switches are active low (true) or active high (false)
+    bool          mHomeSwitchInverted;      // Home switch reading is inverted
     vctUShortVec  mAxisStatus;              // Axis status
     vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
     vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
@@ -141,6 +143,10 @@ protected:
     //    num    Size of data and valid arrays
     // Example output: "SP 1000,,500"
     static char *WriteCmdValues(char *buf, const char *cmd, const int32_t *data, const bool *valid, unsigned int num);
+
+    // Local methods to parse returned value
+    int QueryValueInt(const char *cmd);
+    double QueryValueDouble(const char *cmd);
 
     // Local method to create boolean array from vctBoolVec, also remapping from robot axis to Galil index
     const bool *GetGalilIndexValid(const vctBoolVec &mask) const;

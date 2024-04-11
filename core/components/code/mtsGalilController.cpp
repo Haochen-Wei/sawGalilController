@@ -432,6 +432,26 @@ void mtsGalilController::Startup()
     SetAccel(mAccelDefault);
     SetDecel(mDecelDefault);
 
+    // Check limit and home switch configuration
+    mLimitSwitchActiveLow = true;         // Active low (default)
+    double cn0 = QueryValueDouble("MG _CN0");
+    if (cn0 == 1.0) {
+        mLimitSwitchActiveLow = false;    // Active high
+    }
+    else if (cn0 != -1.0) {
+        CMN_LOG_CLASS_INIT_WARNING << "Startup: failed to parse limit switch state (_CN0): "
+                                   << cn0 << std::endl;
+    }
+    mHomeSwitchInverted = false;         // Home switch value based on input voltage (default)
+    double cn1 = QueryValueDouble("MG _CN1");
+    if (cn1 == 1.0) {
+        mHomeSwitchInverted = true;      // Home switch value inverted
+    }
+    else if (cn1 != -1.0) {
+        CMN_LOG_CLASS_INIT_WARNING << "Startup: failed to parse home switch state (_CN1): "
+                                   << cn1 << std::endl;
+    }
+
     // Store the current setting of limit disable (LD) in mLimitDisable
     mLimitDisable.SetAll(0);
     if (!QueryCmdValues("LD ", mGalilQuery, mLimitDisable)) {
@@ -561,9 +581,9 @@ void mtsGalilController::Run()
                 // active state is low (CN -1).
                 // For the home switch, setting CN -1 is appropriate if the home switch is
                 // tied to the (active low) reverse limit.
-                mActuatorState.HardFwdLimitHit()[i] = mSwitches[i] & SwitchFwdLimit;
-                mActuatorState.HardRevLimitHit()[i] = mSwitches[i] & SwitchRevLimit;
-                mActuatorState.HomeSwitchOn()[i]    = mSwitches[i] & SwitchHome;
+                mActuatorState.HardFwdLimitHit()[i] = mLimitSwitchActiveLow ^ static_cast<bool>(mSwitches[i] & SwitchFwdLimit);
+                mActuatorState.HardRevLimitHit()[i] = mLimitSwitchActiveLow ^ static_cast<bool>(mSwitches[i] & SwitchRevLimit);
+                mActuatorState.HomeSwitchOn()[i]    = mHomeSwitchInverted ^ static_cast<bool>(mSwitches[i] & SwitchHome);
                 // Set home state:
                 //   - Absolute encoder: always homed
                 //   - Incremental encoder: if controller supports the user "var" (ZA) field,
@@ -668,6 +688,26 @@ char *mtsGalilController::WriteCmdValues(char *buf, const char *cmd, const int32
     buf[len-1] = 0;
 
     return buf;
+}
+
+// Query a single integer
+int mtsGalilController::QueryValueInt(const char *cmd)
+{
+    int value = 0;
+    GReturn ret = GCmdI(mGalil, cmd, &value);
+    if (ret != G_NO_ERROR)
+        mInterface->SendError(this->GetName() + " QueryValueInt failed");
+    return value;
+}
+
+// Query a single double
+double mtsGalilController::QueryValueDouble(const char *cmd)
+{
+    double value = 0.0;
+    GReturn ret = GCmdD(mGalil, cmd, &value);
+    if (ret != G_NO_ERROR)
+        mInterface->SendError(this->GetName() + " QueryValueDouble failed");
+    return value;
 }
 
 // Issue a query command (e.g., LD ?,?,?) and return the result in the data vector
