@@ -12,7 +12,7 @@
             "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
-                "offset": 64385387           // 64391387-6000
+                "offset": 64397387           // 64391387+6000
             },
 	    "is_absolute": 1
         },
@@ -21,7 +21,7 @@
             "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
-                "offset": 65644013           // 65650013-6000
+                "offset": 65656013           // 65650013+6000
             },
 	    "is_absolute": 1
         },
@@ -30,7 +30,7 @@
             "type": "PRISMATIC",
             "position_bits_to_SI": {
                 "scale":  4096000,
-                "offset": 66229792           // 66235792-6000
+                "offset": 66241792           // 66235792+6000
             },
 	    "is_absolute": 1
         },
