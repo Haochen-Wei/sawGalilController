@@ -5,7 +5,7 @@ inline-header {
 #include <set>
 #include <limits>
 #include <cisstCommon/cmnUnits.h>
-#include <cisstParameterTypes/prmJointType.h>
+#include <cisstCommon/cmnJointType.h>
 #include <sawGalilController/sawGalilControllerRevision.h>
 #include <sawGalilController/sawGalilControllerExport.h>
 
@@ -110,7 +110,7 @@ class {
     }
     member {
         name type;
-        type prmJointType;
+        type cmnJointType;
         visibility public;
     }
     member {
