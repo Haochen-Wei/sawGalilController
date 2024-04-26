@@ -158,10 +158,10 @@ public:
         get_config_js(m_config_js);
         // Set jtscale based on joint type (prismatic or revolute)
         for (size_t i = 0; i < NumAxes; i++) {
-            if (m_config_js.Type()[i] == PRM_JOINT_PRISMATIC) {
+            if (m_config_js.Type()[i] == CMN_JOINT_PRISMATIC) {
                 jtscale[i] = 1000.0;     // meters --> millimeters
             }
-            else if (m_config_js.Type()[i] == PRM_JOINT_REVOLUTE) {
+            else if (m_config_js.Type()[i] == CMN_JOINT_REVOLUTE) {
                 jtscale[i] = cmn180_PI;  // radians --> degrees
             }
             else {

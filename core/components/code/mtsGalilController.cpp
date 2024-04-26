@@ -346,7 +346,7 @@ void mtsGalilController::Configure(const std::string& fileName)
         m_measured_js.Name()[axis].assign(1, galilChannel);
         m_setpoint_js.Name()[axis].assign(1, galilChannel);
         m_config_j.Name()[axis].assign(1, galilChannel);
-        m_config_j.Type()[axis] = static_cast<prmJointType>(axisData.type);
+        m_config_j.Type()[axis] = static_cast<cmnJointType>(axisData.type); // That seems dangerous since enum can be redefined
         m_config_j.PositionMin()[axis] = axisData.position_limits.lower;
         m_config_j.PositionMax()[axis] = axisData.position_limits.upper;
         mEncoderCountsPerUnit[axis] = axisData.position_bits_to_SI.scale;
