@@ -33,7 +33,7 @@ enum GALIL_STATES { ST_IDLE, ST_HOMING };
 //   - GDataRecord4000 (DMC 4000, 4200, 4103, and 500x0)
 //   - GDataRecord52000 (DMC 52000)
 //   - GDataRecord1806 (DMC 1806)
-//   - GDataRecord2103 (DMC 2103)
+//   - GDataRecord2103 (DMC 2103 and 2102)
 //   - GDataRecord1802 (DMC 1802)
 //   - GDataRecord30000 (DMC 30010)
 //
@@ -49,7 +49,7 @@ struct AxisDataMin {
     int32_t  pos_error;
     int32_t  aux_pos;
     int32_t  vel;
-    int32_t  torque;
+    int32_t  torque;      // TODO: int16_t for DMC 2103 and 1802
     uint16_t analog_in;   // reserved for 1802
 };
 
@@ -115,7 +115,7 @@ const unsigned int ModelTypes[NUM_MODELS]     = {  4000, 52000,  1806,  2103,  1
 // Byte offset to the start of the axis data
 const unsigned int AxisDataOffset[NUM_MODELS] = {    82,    82,    78 ,   44,    40,    38 };
 // Size of the axis data
-const size_t AxisDataSize[NUM_MODELS]         = { ADmax, ADmax, ADmin, ADmin, ADmin, ADmax };
+const size_t AxisDataSize[NUM_MODELS]         = { ADmax, ADmax, ADmin, ADmin-2, ADmin-2, ADmax };
 // Whether the first 4 bytes contain header information
 // For DMC-4143, the header bytes are: 135 (0x87), 15 (0x0f), 226 , 0
 //   0x87 MSB always set; 7 indicates that I (Input), T (T Plane) and S (S Plane) blocks present
@@ -550,10 +550,12 @@ void mtsGalilController::Run()
                 m_measured_js.Position()[i] = (axisPtr->pos - mEncoderOffset[i])/mEncoderCountsPerUnit[i];
                 m_measured_js.Velocity()[i] = axisPtr->vel/mEncoderCountsPerUnit[i];
                 m_setpoint_js.Position()[i] = (axisPtr->ref_pos - mEncoderOffset[i])/mEncoderCountsPerUnit[i];
+                // TODO: update following line for DMC 2103 and 1802 (16-bit instead of 32-bit)
                 m_setpoint_js.Effort()[i] = (axisPtr->torque*9.9982)/32767.0;  // See Galil TT command
                 mAxisStatus[i] = axisPtr->status;     // See Galil User Manual
                 mStopCode[i] = axisPtr->stop_code;    // See Galil SC command
                 mSwitches[i] = axisPtr->switches;     // See Galil User Manual
+                // TODO: fix following line for DMC 2103 and 1802
                 mAnalogIn[i] = axisPtr->analog_in;
                 if (mAxisStatus[i] & StatusMotorMoving)
                     isAnyMoving = true;

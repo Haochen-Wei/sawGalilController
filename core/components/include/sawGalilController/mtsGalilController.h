@@ -12,12 +12,20 @@
   which can be specified (as "galil_model") in the JSON configuration file.
   Valid values of "galil_model" (which is an unsigned integer) are:
 
-      4000   for DMC 4000, 4200, 4103, and 500x0 (default)
+      4000   for DMC 4000, 4200, 4103, and 50000 (default)
      52000   for DMC 52000
       1806   for DMC 1806
-      2103   for DMC 2103
+      2103   for DMC 2103, 2102
       1802   for DMC 1802
      30000   for DMC 30010
+
+  Note that Galil also specifies these model numbers using "x" for the field that is
+  typically used to specify the number of axes, i.e.:
+     40x0, 42x0, 41x3, 500x0, 52xx0, 18x6, 21x3, 21x2, 18x2, 30x1x
+  (52xx0 supports up to 32 axes, and 30x1x uses the second x to specify type of drive)
+
+  It is recommended to not specify "galil_model" in the JSON file (in which case it
+  defaults to 0) and instead allow the system to auto-detect.
 
 --- begin cisst license - do not edit ---
 
