@@ -128,6 +128,8 @@ const unsigned int SampleOffset[NUM_MODELS]   = {     4,     4,     0,     4,   
 const unsigned int ErrorCodeOffset[NUM_MODELS] = {   50,    50,    46,    26,    22,    10 };
 // Byte offset to amplifier status (-1 means not available)
 const int AmpStatusOffset[NUM_MODELS]          = {   52,    52,    -1,    -1,    -1,    18 };
+// Whether controller supports the LD (limit disable) command
+const bool HasLimitDisable[NUM_MODELS]        = { true, true, true, false, false, true };
 
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsGalilController, mtsTaskContinuous, mtsStdString)
 
@@ -172,6 +174,7 @@ void mtsGalilController::SetupInterfaces(void)
     StateTable.AddData(mErrorCode, "error_code");
     StateTable.AddData(m_measured_js, "measured_js");
     StateTable.AddData(m_setpoint_js, "setpoint_js");
+    m_op_state.SetValid(true);
     StateTable.AddData(m_op_state, "op_state");
     StateTable.AddData(mAxisStatus, "axis_status");
     StateTable.AddData(mStopCode, "stop_code");
@@ -190,12 +193,13 @@ void mtsGalilController::SetupInterfaces(void)
         // Standard CRTK interfaces
         mInterface->AddCommandReadState(this->StateTable, m_measured_js, "measured_js");
         mInterface->AddCommandReadState(this->StateTable, m_setpoint_js, "setpoint_js");
-        mInterface->AddCommandReadState(this->StateTable, m_op_state, "operating_state");  // TODO
+        mInterface->AddCommandReadState(this->StateTable, m_op_state, "operating_state");
         mInterface->AddCommandWrite(&mtsGalilController::servo_jp, this, "servo_jp");
         mInterface->AddCommandWrite(&mtsGalilController::servo_jr, this, "servo_jr");
         mInterface->AddCommandWrite(&mtsGalilController::servo_jv, this, "servo_jv");
         mInterface->AddCommandVoid(&mtsGalilController::hold, this, "hold");
         mInterface->AddCommandRead(&mtsGalilController::GetConfig_js, this, "configuration_js");
+        mInterface->AddEventWrite(operating_state, "operating_state", prmOperatingState());
 
         mInterface->AddCommandVoid(&mtsGalilController::EnableMotorPower, this, "EnableMotorPower");
         mInterface->AddCommandVoid(&mtsGalilController::DisableMotorPower, this, "DisableMotorPower");
@@ -260,6 +264,23 @@ void mtsGalilController::Configure(const std::string& fileName)
 {
     std::string dmcStartupFile;
 
+    mConfigPath.Set(cmnPath::GetWorkingDirectory());
+    std::string fullname = mConfigPath.Find(fileName);
+    // Handle either forward slash or backslash for directory separator,
+    // since on Windows there can be a mix of them.
+    size_t last_sep = fullname.find_last_of('/');
+    size_t last_sep2 = fullname.find_last_of('\\');
+    if (last_sep == std::string::npos)
+        last_sep = last_sep2;
+    else if ((last_sep2 != std::string::npos) && (last_sep2 > last_sep))
+        last_sep = last_sep2;
+    if (last_sep != std::string::npos) {
+        std::string configDir = fullname.substr(0, last_sep);
+        CMN_LOG_CLASS_INIT_VERBOSE << "Configure: setting mConfigPath to " << configDir
+                                   << " for file " << fileName << std::endl;
+        mConfigPath.Add(configDir, cmnPath::HEAD);
+    }
+
     std::ifstream jsonStream;
     jsonStream.open(fileName.c_str());
     Json::Value jsonConfig;
@@ -281,7 +302,7 @@ void mtsGalilController::Configure(const std::string& fileName)
                                << m_configuration << std::endl;
     
     // Size of array determines number of axes
-    mNumAxes = m_configuration.axes.size();
+    mNumAxes = static_cast<unsigned int>(m_configuration.axes.size());
     CMN_LOG_CLASS_INIT_VERBOSE << "Configure: found " << mNumAxes << " axes" << std::endl;
 
     mModel = GetModelIndex(m_configuration.model);
@@ -321,6 +342,8 @@ void mtsGalilController::Configure(const std::string& fileName)
     mHomePos.SetSize(mNumAxes);
     mHomeLimitDisable.SetSize(mNumAxes);
     mLimitDisable.SetSize(mNumAxes);
+    mHomingMask.SetSize(mNumAxes);
+    mHomingMask.SetAll(false);
     mAxisStatus.SetSize(mNumAxes);
     mStopCode.SetSize(mNumAxes);
     mSwitches.SetSize(mNumAxes);
@@ -341,11 +364,11 @@ void mtsGalilController::Configure(const std::string& fileName)
     for (unsigned int axis = 0; axis < mNumAxes; axis++) {
         sawGalilControllerConfig::axis &axisData = m_configuration.axes[axis];
         mGalilIndexValid[axisData.index] = true;
-        mAxisToGalilIndexMap[axis] = axisData.index;
+        mAxisToGalilIndexMap[axis] = static_cast<unsigned int>(axisData.index);
         mGalilIndexToAxisMap[axisData.index] = axis;
-        char galilChannel = 'A'+axisData.index;
-        if (axisData.index > mGalilIndexMax)
-            mGalilIndexMax = axisData.index;   // Save largest Galil index for future efficiency
+        char galilChannel = 'A' + static_cast<char>(axisData.index);
+        if (mAxisToGalilIndexMap[axis] > mGalilIndexMax)
+            mGalilIndexMax = mAxisToGalilIndexMap[axis];   // Save largest Galil index for future efficiency
         m_measured_js.Name()[axis].assign(1, galilChannel);
         m_setpoint_js.Name()[axis].assign(1, galilChannel);
         m_config_j.Name()[axis].assign(1, galilChannel);
@@ -411,9 +434,10 @@ void mtsGalilController::Startup()
     // Upload a DMC program file if available
     const std::string & DMC_file = m_configuration.DMC_file;
     if (!DMC_file.empty()) {
-        if (cmnPath::Exists(DMC_file)) {
+        std::string fullPath = mConfigPath.Find(DMC_file);
+        if (!fullPath.empty()) {
             CMN_LOG_CLASS_INIT_VERBOSE << "Startup: downloading " << DMC_file << " to Galil controller" << std::endl;
-            if (GProgramDownloadFile(mGalil, DMC_file.c_str(), 0) == G_NO_ERROR) {
+            if (GProgramDownloadFile(mGalil, fullPath.c_str(), 0) == G_NO_ERROR) {
                 SendCommand("XQ");  // Execute downloaded program
             }
             else {
@@ -451,15 +475,6 @@ void mtsGalilController::Startup()
         CMN_LOG_CLASS_INIT_WARNING << "Startup: failed to parse home switch state (_CN1): "
                                    << cn1 << std::endl;
     }
-
-    // Store the current setting of limit disable (LD) in mLimitDisable
-    mLimitDisable.SetAll(0);
-    if (!QueryCmdValues("LD ", mGalilQuery, mLimitDisable)) {
-        CMN_LOG_CLASS_INIT_ERROR << "Startup: Could not query limit disable (LD)" << std::endl;
-    }
-    // Update mHomeLimitDisable based on mLimitDisable
-    for (size_t i = 0; i < mNumAxes; i++)
-        mHomeLimitDisable[i] |= mLimitDisable[i];
 
     // Get controller type (^R^V)
     if (GCmdT(mGalil, "\x12\x16", mBuffer, G_SMALL_BUFFER, 0) == G_NO_ERROR) {
@@ -510,6 +525,17 @@ void mtsGalilController::Startup()
         }
     }
 
+    // Store the current setting of limit disable (LD) in mLimitDisable
+    mLimitDisable.SetAll(0);
+    if (HasLimitDisable[mModel]) {
+        if (!QueryCmdValues("LD ", mGalilQuery, mLimitDisable)) {
+            CMN_LOG_CLASS_INIT_ERROR << "Startup: Could not query limit disable (LD)" << std::endl;
+        }
+        // Update mHomeLimitDisable based on mLimitDisable
+        for (size_t i = 0; i < mNumAxes; i++)
+            mHomeLimitDisable[i] |= mLimitDisable[i];
+    }
+
     ret = GRecordRate(mGalil, m_configuration.DR_period_ms);
     if (ret != G_NO_ERROR) {
         CMN_LOG_CLASS_INIT_ERROR << "Galil GRecordRate: error " << ret << " setting rate to "
@@ -523,6 +549,7 @@ void mtsGalilController::Run()
 {
     GDataRecord gRec;
     GReturn ret;
+    prmOperatingState::StateType newState;
 
     // Get the Galil data record (DR) and parse it
     if (mGalil) {
@@ -616,17 +643,27 @@ void mtsGalilController::Run()
             }
             mMotionActive = isAnyMoving;
             mMotorPowerOn = isAllMotorOn;
-            m_op_state.SetState(mMotorPowerOn ? prmOperatingState::ENABLED : prmOperatingState::DISABLED);
+            newState = mMotorPowerOn ? prmOperatingState::ENABLED : prmOperatingState::DISABLED;
             m_op_state.SetIsBusy(mMotionActive);
         }
         else {
             mMotionActive = false;
             mMotorPowerOn = false;
-            m_op_state.SetState(prmOperatingState::FAULT);
+            newState = prmOperatingState::FAULT;
             m_op_state.SetIsBusy(false);
             char buf[128];
             sprintf(buf, ": GRecord error %d", ret);
             mInterface->SendError(this->GetName() + buf);
+        }
+        bool isAllHomed = mActuatorState.IsHomed().All();
+        if ((newState != m_op_state.State()) ||
+            (mMotionActive != m_op_state.IsBusy()) ||
+            (isAllHomed != m_op_state.IsHomed())) {
+            m_op_state.SetState(newState);
+            m_op_state.SetIsBusy(mMotionActive);
+            m_op_state.SetIsHomed(isAllHomed);
+            // Trigger event
+            operating_state(m_op_state);
         }
     }
 
@@ -645,13 +682,27 @@ void mtsGalilController::Run()
         break;
 
     case ST_HOMING:
-        // TODO: this implementation assumes that all axes are being homed
-        if (mStopCode.Equal(SC_Homing)) {
-            SetHomePosition(mHomePos);
-            mActuatorState.IsHomed().SetAll(true);
-            m_op_state.SetIsHomed(true);
-            if (!galil_cmd_common("home (LD-restore)", "LD ", mLimitDisable))
-               mInterface->SendError("Home: failed to restore limits");
+        // First, check whether any axes still homing
+        for (size_t i = 0; i < mNumAxes; i++) {
+            if (mHomingMask[i] && (mStopCode[i] == SC_Homing)) {
+                mHomingMask[i] = false;
+                mActuatorState.IsHomed()[i] = true;
+                // Compute home position in encoder counts
+                int32_t hpos = static_cast<int32_t>(std::round(mHomePos[i]*mEncoderCountsPerUnit[i]))
+                               + mEncoderOffset[i];
+                char galilChan = 'A' + mAxisToGalilIndexMap[i];
+                // Set home position for specified channel
+                sprintf(mBuffer, "DP%c=%ld", galilChan, hpos);
+                SendCommand(mBuffer);
+            }
+        }
+        // Now, check if all axes are homed
+        if (!mHomingMask.Any()) {
+            // Homing done
+            if (HasLimitDisable[mModel]) {
+                if (!galil_cmd_common("home (LD-restore)", "LD ", mLimitDisable))
+                   mInterface->SendError("Home: failed to restore limits");
+            }
             mInterface->SendStatus(this->GetName() + ": finished homing");
             mState = ST_IDLE;
         }
@@ -945,21 +996,47 @@ const char *mtsGalilController::GetGalilAxes(const bool *galilIndexValid) const
     return galilMaskString;
 }
 
+bool mtsGalilController::CheckHomingMask(const char *cmdName, const vctBoolVec &inMask, vctBoolVec &outMask) const
+{
+    if (inMask.size() != outMask.size()) {
+        mInterface->SendError(this->GetName() + ": size mismatch in " + std::string(cmdName));
+        CMN_LOG_CLASS_RUN_ERROR << cmdName << ": size mismatch (inMask size = " << inMask.size()
+                                << ", outMask size = " << outMask.size() << ")" << std::endl;
+        return false;
+    }
+    if (mState == ST_HOMING) {
+        mInterface->SendWarning(this->GetName() + ": " + std::string(cmdName) + " ignored because robot is homing");
+        return false;
+    }
+    for (size_t i = 0; i < outMask.size(); i++) {
+        // Can't unhome absolute encoder
+        outMask[i] = inMask[i] & (!mEncoderAbsolute[i]);
+    }
+    if (!outMask.Any())
+        mInterface->SendWarning(std::string(cmdName) + ": no valid axes");
+    return outMask.Any();
+}
+
 void mtsGalilController::Home(const vctBoolVec &mask)
 {
+    if (!CheckHomingMask("Home", mask, mHomingMask))
+        return;
+
     if (!mMotorPowerOn) {
         mInterface->SendError("Home: motor power is off");
         return;
     }
-    const bool *galilIndexValid = GetGalilIndexValid(mask);
+
+    const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
     const char *galilAxes = GetGalilAxes(galilIndexValid);
 
-    UnHome(mask);
+    UnHome(mHomingMask);
     if (mMotionActive)
         SendCommand(WriteCmdAxes(mBuffer, "ST ", galilAxes));
 
     // Check whether limit needs to be disabled
-    if (mHomeLimitDisable.Any() && (mHomeLimitDisable != mLimitDisable)) {
+    if (HasLimitDisable[mModel] &&
+        mHomeLimitDisable.Any() && (mHomeLimitDisable != mLimitDisable)) {
         if (!galil_cmd_common("home (LD)", "LD ", mHomeLimitDisable)) {
             mInterface->SendError("Home: failed to disable limits");
             return;
@@ -973,7 +1050,10 @@ void mtsGalilController::Home(const vctBoolVec &mask)
 
 void mtsGalilController::UnHome(const vctBoolVec &mask)
 {
-    const bool *galilIndexValid = GetGalilIndexValid(mask);
+    if (!CheckHomingMask("UnHome", mask, mHomingMask))
+        return;
+
+    const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
     int32_t galilData[GALIL_MAX_AXES];
     for (unsigned int i = 0; i < mGalilIndexMax; i++)
         galilData[i] = 0;
@@ -983,11 +1063,14 @@ void mtsGalilController::UnHome(const vctBoolVec &mask)
 
 void mtsGalilController::FindEdge(const vctBoolVec &mask)
 {
+    if (!CheckHomingMask("FindEdge", mask, mHomingMask))
+        return;
+
     if (!mMotorPowerOn) {
         mInterface->SendError("FindEdge: motor power is off");
         return;
     }
-    const bool *galilIndexValid = GetGalilIndexValid(mask);
+    const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
     const char *galilAxes = GetGalilAxes(galilIndexValid);
 
     if (mMotionActive)
@@ -998,11 +1081,14 @@ void mtsGalilController::FindEdge(const vctBoolVec &mask)
 
 void mtsGalilController::FindIndex(const vctBoolVec &mask)
 {
+    if (!CheckHomingMask("FindIndex", mask, mHomingMask))
+        return;
+
     if (!mMotorPowerOn) {
         mInterface->SendError("FindIndex: motor power is off");
         return;
     }
-    const bool *galilIndexValid = GetGalilIndexValid(mask);
+    const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
     const char *galilAxes = GetGalilAxes(galilIndexValid);
 
     if (mMotionActive)

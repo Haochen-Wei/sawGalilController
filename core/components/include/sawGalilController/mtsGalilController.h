@@ -41,6 +41,7 @@ http://www.cisst.org/cisst/license.txt.
 
 #include <string>
 
+#include <cisstCommon/cmnPath.h>
 #include <cisstVector/vctDynamicVectorTypes.h>
 #include <cisstMultiTask/mtsTaskContinuous.h>
 #include <cisstMultiTask/mtsInterfaceProvided.h>
@@ -82,6 +83,9 @@ protected:
     void         *mGalil;                   // Gcon
     sawGalilControllerConfig::controller m_configuration;
 
+    // Path to configuration files
+    cmnPath mConfigPath;
+
     unsigned int  mModel;                   // Galil model
     unsigned int  mNumAxes;                 // Number of axes
     unsigned int  mGalilIndexMax;           // Maximum galil index
@@ -104,6 +108,7 @@ protected:
     vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
     bool          mLimitSwitchActiveLow;    // Limit switches are active low (true) or active high (false)
     bool          mHomeSwitchInverted;      // Home switch reading is inverted
+    vctBoolVec    mHomingMask;              // Mask for use in homing routines
     vctUShortVec  mAxisStatus;              // Axis status
     vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
     vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
@@ -118,6 +123,8 @@ protected:
     vctDoubleVec  mDecel;                   // Current decel
     unsigned int  mState;                   // Internal state machine
     mtsInterfaceProvided *mInterface;       // Provided interface
+
+    mtsFunctionWrite operating_state;       // Event generator
 
     // String of configured axes (e.g., "ABC")
     char mGalilAxes[GALIL_MAX_AXES+1];
@@ -160,6 +167,10 @@ protected:
     const bool *GetGalilIndexValid(const vctBoolVec &mask) const;
     // Local method to create axes string for specified array of valid Galil indices
     const char *GetGalilAxes(const bool *galilIndexValid) const;
+    // Local method to set outMask based on inMask, clearing any entries that correspond to absolute encoders.
+    // The method returns false if the inMask is not the correct length (same length as outMask), if the robot
+    // is currently homing, or if none of the elements in outMask are true.
+    bool CheckHomingMask(const char *cmdName, const vctBoolVec &inMask, vctBoolVec &outMask) const;
 
     void Init();
     void Close();
