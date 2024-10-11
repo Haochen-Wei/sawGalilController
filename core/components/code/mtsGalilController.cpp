@@ -402,10 +402,6 @@ void mtsGalilController::Configure(const std::string& fileName)
             mHomeLimitDisable[axis] |= 1;   // Disable upper limit switch
     }
     mGalilIndexMax++;   // Increment so that we can test for less than
-    // We need a custom homing sequence (FE + FI) rather than HM if the Galil controller
-    // does not support the LD (limit disable) command and if any of the axes are homing
-    // at a limit.
-    mHomeCustom = (!HasLimitDisable[mModel] && mHomeLimitDisable.Any());
 
     unsigned int k = 0;
     unsigned int q = 0;
@@ -553,6 +549,11 @@ void mtsGalilController::Startup()
         for (size_t i = 0; i < mNumAxes; i++)
             mHomeLimitDisable[i] |= mLimitDisable[i];
     }
+
+    // We need a custom homing sequence (FE + FI) rather than HM if the Galil controller
+    // does not support the LD (limit disable) command and if any of the axes are homing
+    // at a limit.
+    mHomeCustom = (!HasLimitDisable[mModel] && mHomeLimitDisable.Any());
 
     ret = GRecordRate(mGalil, m_configuration.DR_period_ms);
     if (ret != G_NO_ERROR) {
