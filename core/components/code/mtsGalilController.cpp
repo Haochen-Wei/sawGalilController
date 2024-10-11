@@ -49,15 +49,26 @@ struct AxisDataMin {
     int32_t  pos_error;
     int32_t  aux_pos;
     int32_t  vel;
-    int32_t  torque;      // TODO: int16_t for DMC 2103 and 1802
+};
+
+// For DMC 2103 and 1802, which use 16-bits for torque
+struct AxisDataOld : public AxisDataMin {
+    int16_t  torque;
     uint16_t analog_in;   // reserved for 1802
+};
+
+// For all other DMC controllers (4000, 52000, 1806, 30000),
+// which use 32-bits for torque
+struct AxisDataNew : public AxisDataMin {
+    int32_t  torque;
+    uint16_t analog_in;
 };
 
 // AxisDataMax supported by:
 //   - GDataRecord4000 (DMC 4000, 4200, 4103, and 500x0)
 //   - GDataRecord52000 (DMC 52000)
 //   - GDataRecord30000 (DMC 30010)
-struct AxisDataMax : public AxisDataMin {
+struct AxisDataMax : public AxisDataNew {
     uint8_t  hall;        // reserved for 1806
     uint8_t  reserved;
     int32_t  var;         // User-defined (ZA)
@@ -108,14 +119,15 @@ const uint8_t SC_Homing   = 10;   // Stopped after homing (HM) or find index (FI
 // There currently are 6 different DMC model types. We do not support any RIO controllers.
 // Note also the Galil QZ command, which returns information about the DR structure.
 const size_t NUM_MODELS = 6;
-const size_t ADmin = sizeof(AxisDataMin);
+const size_t ADold = sizeof(AxisDataOld);
+const size_t ADnew = sizeof(AxisDataNew);
 const size_t ADmax = sizeof(AxisDataMax);
 // The Galil model types (corresponding to the different GDataRecord structs)
 const unsigned int ModelTypes[NUM_MODELS]     = {  4000, 52000,  1806,  2103,  1802, 30000 };
 // Byte offset to the start of the axis data
 const unsigned int AxisDataOffset[NUM_MODELS] = {    82,    82,    78 ,   44,    40,    38 };
 // Size of the axis data
-const size_t AxisDataSize[NUM_MODELS]         = { ADmax, ADmax, ADmin, ADmin-2, ADmin-2, ADmax };
+const size_t AxisDataSize[NUM_MODELS]         = { ADmax, ADmax, ADnew, ADold, ADold, ADmax };
 // Whether the first 4 bytes contain header information
 // For DMC-4143, the header bytes are: 135 (0x87), 15 (0x0f), 226 , 0
 //   0x87 MSB always set; 7 indicates that I (Input), T (T Plane) and S (S Plane) blocks present
@@ -130,26 +142,28 @@ const unsigned int ErrorCodeOffset[NUM_MODELS] = {   50,    50,    46,    26,   
 const int AmpStatusOffset[NUM_MODELS]          = {   52,    52,    -1,    -1,    -1,    18 };
 // Whether controller supports the LD (limit disable) command
 const bool HasLimitDisable[NUM_MODELS]        = { true, true, true, false, false, true };
+// Whether controller supports the ZA (user data) command
+const bool HasUserDataZA[NUM_MODELS]          = { true, true, true, false, false, true };
 
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsGalilController, mtsTaskContinuous, mtsStdString)
 
 mtsGalilController::mtsGalilController(const std::string &name) :
     mtsTaskContinuous(name, 1024, true), mGalil(0), mHeader(0), mAmpStatus(0),
-    mMotorPowerOn(false), mMotionActive(false), mState(ST_IDLE)
+    mMotorPowerOn(false), mMotionActive(false), mState(ST_IDLE), mTimeout(0)
 {
     Init();
 }
 
 mtsGalilController::mtsGalilController(const std::string &name, unsigned int sizeStateTable, bool newThread) :
     mtsTaskContinuous(name, sizeStateTable, newThread), mGalil(0), mHeader(0), mAmpStatus(0),
-    mMotorPowerOn(false), mMotionActive(false), mState(ST_IDLE)
+    mMotorPowerOn(false), mMotionActive(false), mState(ST_IDLE), mTimeout(0)
 {
     Init();
 }
 
 mtsGalilController::mtsGalilController(const mtsTaskContinuousConstructorArg & arg) :
     mtsTaskContinuous(arg), mGalil(0), mHeader(0),mAmpStatus(0),  mMotorPowerOn(false), mMotionActive(false),
-    mState(ST_IDLE)
+    mState(ST_IDLE), mTimeout(0)
 {
     Init();
 }
@@ -346,6 +360,7 @@ void mtsGalilController::Configure(const std::string& fileName)
     mHomingMask.SetAll(false);
     mAxisStatus.SetSize(mNumAxes);
     mStopCode.SetSize(mNumAxes);
+    mStopCodeChange.SetSize(mNumAxes);
     mSwitches.SetSize(mNumAxes);
     mAnalogIn.SetSize(mNumAxes);
 
@@ -385,9 +400,12 @@ void mtsGalilController::Configure(const std::string& fileName)
             mHomeLimitDisable[axis] |= 2;   // Disable lower limit switch
         else if (axisData.home_pos >= axisData.position_limits.upper)
             mHomeLimitDisable[axis] |= 1;   // Disable upper limit switch
-
     }
     mGalilIndexMax++;   // Increment so that we can test for less than
+    // We need a custom homing sequence (FE + FI) rather than HM if the Galil controller
+    // does not support the LD (limit disable) command and if any of the axes are homing
+    // at a limit.
+    mHomeCustom = (!HasLimitDisable[mModel] && mHomeLimitDisable.Any());
 
     unsigned int k = 0;
     unsigned int q = 0;
@@ -564,8 +582,9 @@ void mtsGalilController::Run()
             if (AmpStatusOffset[mModel] >= 0)
                 mAmpStatus = *reinterpret_cast<uint32_t *>(gRec.byte_array + AmpStatusOffset[mModel]);
             // Get the axis data
-            // Since we currently do not care about the last 3 entries (in AxisDataMax), we
-            // just cast to AxisDataMin and handle the different offsets.
+            // Note that all controllers support AxisDataMin, so we first get most of the data from that
+            // subset of the structure. Later, we cast to AxisDataOld or AxisDataNew, depending on the model
+            // number, to read torque and analog input. Finally, there is one field we read from AxisDataMax.
             bool isAnyMoving = false;
             bool isAllMotorOn = true;
             bool isAllMotorOff = true;
@@ -577,13 +596,23 @@ void mtsGalilController::Run()
                 m_measured_js.Position()[i] = (axisPtr->pos - mEncoderOffset[i])/mEncoderCountsPerUnit[i];
                 m_measured_js.Velocity()[i] = axisPtr->vel/mEncoderCountsPerUnit[i];
                 m_setpoint_js.Position()[i] = (axisPtr->ref_pos - mEncoderOffset[i])/mEncoderCountsPerUnit[i];
-                // TODO: update following line for DMC 2103 and 1802 (16-bit instead of 32-bit)
-                m_setpoint_js.Effort()[i] = (axisPtr->torque*9.9982)/32767.0;  // See Galil TT command
                 mAxisStatus[i] = axisPtr->status;     // See Galil User Manual
+                mStopCodeChange[i] = (mStopCode[i] != axisPtr->stop_code);
                 mStopCode[i] = axisPtr->stop_code;    // See Galil SC command
                 mSwitches[i] = axisPtr->switches;     // See Galil User Manual
-                // TODO: fix following line for DMC 2103 and 1802
-                mAnalogIn[i] = axisPtr->analog_in;
+                if ((ModelTypes[mModel] == 1802) || (ModelTypes[mModel] == 2103)) {
+                    // For DMC 2103 and 1802
+                    AxisDataOld *axisPtrOld = reinterpret_cast<AxisDataOld *>(axisPtr);
+                    m_setpoint_js.Effort()[i] = (axisPtrOld->torque*9.9982)/32767.0;  // See Galil TT command
+                    mAnalogIn[i] = axisPtrOld->analog_in;
+                }
+                else {
+                    // For all other controllers
+                    AxisDataNew *axisPtrNew = reinterpret_cast<AxisDataNew *>(axisPtr);
+                    m_setpoint_js.Effort()[i] = (axisPtrNew->torque*9.9982)/32767.0;  // See Galil TT command
+                    mAnalogIn[i] = axisPtrNew->analog_in;
+                }
+                // Now process the data
                 if (mAxisStatus[i] & StatusMotorMoving)
                     isAnyMoving = true;
                 if (mAxisStatus[i] & StatusMotorOff)
@@ -618,8 +647,7 @@ void mtsGalilController::Run()
                 //   - Incremental encoder: if controller supports the user "var" (ZA) field,
                 //       then we can read it; otherwise, we rely on the home/unhome commands
                 //       to update the home state.
-                //  TODO: could at least query ZA on startup for systems that do not support
-                //        it in the data record (DR).
+                //  TODO: need to handle controllers that do not support ZA command.
                 //  TODO: remove following code and only query ZA on startup
                 if (mEncoderAbsolute[i]) {
                     mActuatorState.IsHomed()[i] = true;
@@ -634,7 +662,8 @@ void mtsGalilController::Run()
             // is it sufficient to use mSampleNum, perhaps scaled by the DR period
             mActuatorState.SetTimestamp(mSampleNum);
 
-            if (!isAllMotorOn && !isAllMotorOff) {
+            if (mTimeout > 0) mTimeout--;
+            if (!isAllMotorOn && !isAllMotorOff && (mTimeout == 0)) {
                 // If a mix of on/off motors, turn them all off
                 mInterface->SendWarning(this->GetName() + ": inconsistent motor power (turning off)");
                 DisableMotorPower();
@@ -684,16 +713,62 @@ void mtsGalilController::Run()
     case ST_HOMING:
         // First, check whether any axes still homing
         for (size_t i = 0; i < mNumAxes; i++) {
-            if (mHomingMask[i] && (mStopCode[i] == SC_Homing)) {
-                mHomingMask[i] = false;
-                mActuatorState.IsHomed()[i] = true;
-                // Compute home position in encoder counts
-                int32_t hpos = static_cast<int32_t>(std::round(mHomePos[i]*mEncoderCountsPerUnit[i]))
-                               + mEncoderOffset[i];
-                char galilChan = 'A' + mAxisToGalilIndexMap[i];
-                // Set home position for specified channel
-                sprintf(mBuffer, "DP%c=%ld", galilChan, hpos);
-                SendCommand(mBuffer);
+            if (mHomingMask[i]) {
+                char buf[64];
+                if ((mStopCode[i] == SC_FindEdge) ||
+                    (mHomeCustom && ((mStopCode[i] == SC_FwdLim) || (mStopCode[i] == SC_RevLim)))) {
+                    if (mStopCodeChange[i]) {
+                        if (mStopCode[i] == SC_FwdLim)
+                            sprintf(buf, ": found forward limit on axis %d", static_cast<int>(i));
+                        else if (mStopCode[i] == SC_RevLim)
+                            sprintf(buf, ": found reverse limit on axis %d", static_cast<int>(i));
+                        else
+                            sprintf(buf, ": found homing edge on axis %d", static_cast<int>(i));
+                        mInterface->SendStatus(this->GetName() + buf);
+                        if (mHomeCustom) {
+                            char galilChan = 'A' + mAxisToGalilIndexMap[i];
+                            // Wait for previous motion to finish (seems to be necessary if motion
+                            // stopped due to limit switch)
+                            sprintf(mBuffer, "AM %c", galilChan);
+                            SendCommand(mBuffer);
+                            // Set speed for FI command
+                            sprintf(mBuffer, "JG%c=-500", galilChan);  // PK TEMP
+                            SendCommand(mBuffer);
+                            // Issue the FI (FindIndex) command on that axis
+                            sprintf(mBuffer,"FI %c", galilChan);
+                            SendCommand(mBuffer);
+                            // Start the motion
+                            sprintf(mBuffer, "BG %c", galilChan);
+                            SendCommand(mBuffer);
+                        }
+                    }
+                }
+                else if (mStopCode[i] == SC_Homing) {
+                    mHomingMask[i] = false;
+                    mActuatorState.IsHomed()[i] = true;
+                    // Compute home position in encoder counts
+                    int32_t hpos = static_cast<int32_t>(std::round(mHomePos[i]*mEncoderCountsPerUnit[i]))
+                                   + mEncoderOffset[i];
+                    char galilChan = 'A' + mAxisToGalilIndexMap[i];
+                    // Wait for previous motion to finish (seems to be necessary sometimes)
+                    sprintf(mBuffer, "AM %c", galilChan);
+                    SendCommand(mBuffer);
+                    // Set home position for specified channel
+                    sprintf(mBuffer, "DP%c=%ld", galilChan, hpos);
+                    SendCommand(mBuffer);
+                    // Restore original speed
+                    SetSpeed(mSpeed);
+                    sprintf(buf, ": finished homing on axis %d", static_cast<int>(i));
+                    mInterface->SendStatus(this->GetName() + buf);
+                }
+                else if (mStopCode[i] != SC_Running) {
+                    if (mStopCodeChange[i]) {
+                        sprintf(buf, ": found stop code %d when homing axis %d", mStopCode[i], static_cast<int>(i));
+                        mInterface->SendStatus(this->GetName() + buf);
+                        // TODO: abort homing this axis if stopped due to an error
+                        mHomingMask[i] = false;
+                    }
+                }
             }
         }
         // Now, check if all axes are homed
@@ -703,7 +778,7 @@ void mtsGalilController::Run()
                 if (!galil_cmd_common("home (LD-restore)", "LD ", mLimitDisable))
                    mInterface->SendError("Home: failed to restore limits");
             }
-            mInterface->SendStatus(this->GetName() + ": finished homing");
+            mInterface->SendStatus(this->GetName() + ": finished homing all axes");
             mState = ST_IDLE;
         }
         break;
@@ -823,19 +898,20 @@ void mtsGalilController::SendCommandRet(const std::string &cmdString, std::strin
 void mtsGalilController::EnableMotorPower(void)
 {
     SendCommand(WriteCmdAxes(mBuffer, "SH ", mGalilAxes));
+    mTimeout = 20;
 }
 
 // Disable motor power
 void mtsGalilController::DisableMotorPower(void)
 {
-    // Sending both ST and MO does not seem to work. Adding AM
-    // in between does not seem to help either.
     if (mMotionActive) {
         SendCommand(WriteCmdAxes(mBuffer, "ST ", mGalilAxes));
+        SendCommand(WriteCmdAxes(mBuffer, "AM ", mGalilAxes));
         // TEMP: set speed in case previous command was servo_jv
         SetSpeed(mSpeed);
     }
     SendCommand(WriteCmdAxes(mBuffer, "MO ", mGalilAxes));
+    mTimeout = 20;
 }
 
 void mtsGalilController::AbortProgram()
@@ -1043,8 +1119,19 @@ void mtsGalilController::Home(const vctBoolVec &mask)
         }
     }
 
-    SendCommand(WriteCmdAxes(mBuffer, "HM ", galilAxes));
-    SendCommand(WriteCmdAxes(mBuffer, "BG ", galilAxes));
+    if (mHomeCustom) {
+        // If this controller does not support LD (limit disable) and any axis
+        // is homing at a limit, we need to do a custom home sequence because
+        // the HM command will be aborted when the limit is reached.
+        SendCommand(WriteCmdAxes(mBuffer, "FE ", galilAxes));
+        SendCommand(WriteCmdAxes(mBuffer, "BG ", galilAxes));
+        mInterface->SendStatus(this->GetName() + ": starting home (FE)");
+    }
+    else {
+        SendCommand(WriteCmdAxes(mBuffer, "HM ", galilAxes));
+        SendCommand(WriteCmdAxes(mBuffer, "BG ", galilAxes));
+        mInterface->SendStatus(this->GetName() + ": starting home (HM)");
+    }
     mState = ST_HOMING;
 }
 
@@ -1053,11 +1140,13 @@ void mtsGalilController::UnHome(const vctBoolVec &mask)
     if (!CheckHomingMask("UnHome", mask, mHomingMask))
         return;
 
-    const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
-    int32_t galilData[GALIL_MAX_AXES];
-    for (unsigned int i = 0; i < mGalilIndexMax; i++)
-        galilData[i] = 0;
-    SendCommand(WriteCmdValues(mBuffer, "ZA ", galilData, galilIndexValid, mGalilIndexMax));
+    if (HasUserDataZA[mModel]) {
+        const bool *galilIndexValid = GetGalilIndexValid(mHomingMask);
+        int32_t galilData[GALIL_MAX_AXES];
+        for (unsigned int i = 0; i < mGalilIndexMax; i++)
+            galilData[i] = 0;
+        SendCommand(WriteCmdValues(mBuffer, "ZA ", galilData, galilIndexValid, mGalilIndexMax));
+    }
     m_op_state.SetIsHomed(false);
 }
 
@@ -1100,9 +1189,11 @@ void mtsGalilController::FindIndex(const vctBoolVec &mask)
 void mtsGalilController::SetHomePosition(const vctDoubleVec &pos)
 {
     if (galil_cmd_common("SetHomePosition", "DP ", pos, true)) {
-        int32_t galilData[GALIL_MAX_AXES];
-        for (unsigned int i = 0; i < mGalilIndexMax; i++)
-            galilData[i] = 1;
-        SendCommand(WriteCmdValues(mBuffer, "ZA ", galilData, mGalilIndexValid, mGalilIndexMax));
+        if (HasUserDataZA[mModel]) {
+            int32_t galilData[GALIL_MAX_AXES];
+            for (unsigned int i = 0; i < mGalilIndexMax; i++)
+                galilData[i] = 1;
+            SendCommand(WriteCmdValues(mBuffer, "ZA ", galilData, mGalilIndexValid, mGalilIndexMax));
+        }
     }
 }

@@ -109,8 +109,10 @@ protected:
     bool          mLimitSwitchActiveLow;    // Limit switches are active low (true) or active high (false)
     bool          mHomeSwitchInverted;      // Home switch reading is inverted
     vctBoolVec    mHomingMask;              // Mask for use in homing routines
+    bool          mHomeCustom;              // True if custom home needed
     vctUShortVec  mAxisStatus;              // Axis status
     vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
+    vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed
     vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
     vctUShortVec  mAnalogIn;                // Axis analog input
     bool          mMotorPowerOn;            // Whether motor power is on (for all configured motors)
@@ -122,6 +124,7 @@ protected:
     vctDoubleVec  mDecelDefault;            // Default decel
     vctDoubleVec  mDecel;                   // Current decel
     unsigned int  mState;                   // Internal state machine
+    unsigned int  mTimeout;                 // Timeout
     mtsInterfaceProvided *mInterface;       // Provided interface
 
     mtsFunctionWrite operating_state;       // Event generator
