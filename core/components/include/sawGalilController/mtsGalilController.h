@@ -40,6 +40,7 @@ http://www.cisst.org/cisst/license.txt.
 #define _mtsGalilController_h
 
 #include <string>
+#include <cstdint>
 
 #include <cisstCommon/cmnPath.h>
 #include <cisstVector/vctDynamicVectorTypes.h>
