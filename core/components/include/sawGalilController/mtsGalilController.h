@@ -138,10 +138,12 @@ protected:
     bool mGalilIndexValid[GALIL_MAX_AXES];
 
     struct AnalogInputData {
-        std::string name;
-        mtsDoubleVec values;
+        mtsDoubleVec  values;
+        vctUIntVec    AxisToGalilIndexMap;     // Map from axis number to Galil index
+        vctUIntVec    GalilIndexToAxisMap;     // Map from Galil index to axis number
+        mtsInterfaceProvided *mInterface;      // Provided interface
     };
-    std::vector<AnalogInputData> AnalogInputs;
+    std::vector<AnalogInputData> mAnalogInputs;
 
     char *mBuffer;                          // Local buffer for building command strings
 

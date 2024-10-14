@@ -91,7 +91,7 @@
     },
     {
         "name": "footpedal",
-        "command_name": "GetFootpedal",
+        "command_name": "GetAnalogInput",
         "axes": [
         {
             "index": 7

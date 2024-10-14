@@ -252,6 +252,21 @@ void mtsGalilController::SetupInterfaces(void)
         mInterface->AddCommandReadState(this->StateTable, mStopCode, "GetStopCode");
         mInterface->AddCommandReadState(this->StateTable, mSwitches, "GetSwitches");
     }
+
+    for (size_t i = 0; i < mAnalogInputs.size(); i++) {
+        // TODO: set unique name for state table element
+        StateTable.AddData(mAnalogInputs[i].values, "values");
+        mtsInterfaceProvided *prov = AddInterfaceProvided(m_configuration.analog_inputs[i].name);
+        mAnalogInputs[i].mInterface = prov;
+        if (prov) {
+            // for Status, Warning and Error with mtsMessage
+            prov->AddMessageEvents();
+
+            prov->AddCommandRead(&mtsGalilController::GetConnected, this, "GetConnected");
+            prov->AddCommandReadState(this->StateTable, mAnalogInputs[i].values,
+                                      m_configuration.analog_inputs[i].command_name);
+        }
+    }
 }
 
 void mtsGalilController::Close()
@@ -433,6 +448,20 @@ void mtsGalilController::Configure(const std::string& fileName)
     mSpeedDefault.SetAll(0.025);   // 25 mm/s
     mAccelDefault.SetAll(0.256);   // 256 mm/s^2
     mDecelDefault.SetAll(0.256);   // 256 mm/s^2
+
+    // Now for the analog inputs
+    mAnalogInputs.resize(m_configuration.analog_inputs.size());
+    for (size_t i = 0; i < m_configuration.analog_inputs.size(); i++) {
+        size_t numAxes = m_configuration.analog_inputs[i].axes.size();
+        mAnalogInputs[i].values.SetSize(numAxes);
+        mAnalogInputs[i].AxisToGalilIndexMap.SetSize(numAxes);
+        mAnalogInputs[i].GalilIndexToAxisMap.SetSize(GALIL_MAX_AXES);
+        for (size_t axis = 0; axis < numAxes; axis++) {
+            sawGalilControllerConfig::analog_axis &axisData = m_configuration.analog_inputs[i].axes[axis];
+            mAnalogInputs[i].AxisToGalilIndexMap[axis] = static_cast<unsigned int>(axisData.index);
+            mAnalogInputs[i].GalilIndexToAxisMap[axisData.index] = axis;
+        }
+    }
 
     // Call SetupInterfaces after Configure because we need to know the correct sizes of
     // the dynamic vectors, which are based on the number of configured axes.
@@ -686,6 +715,27 @@ void mtsGalilController::Run()
             mMotorPowerOn = isAllMotorOn;
             newState = mMotorPowerOn ? prmOperatingState::ENABLED : prmOperatingState::DISABLED;
             m_op_state.SetIsBusy(mMotionActive);
+
+            // Now, for the analog inputs
+            for (size_t ai = 0; ai < mAnalogInputs.size(); ai++) {
+                for (size_t axis = 0; axis < mAnalogInputs[ai].values.size(); axis++) {
+                    unsigned int galilAxis = mAnalogInputs[ai].AxisToGalilIndexMap[axis];
+                    if ((ModelTypes[mModel] == 1802) || (ModelTypes[mModel] == 2103)) {
+                        // For DMC 2103 and 1802
+                        AxisDataOld *axisPtrOld = reinterpret_cast<AxisDataOld *>(gRec.byte_array +
+                                                                                  AxisDataOffset[mModel] +
+                                                                                  galilAxis*AxisDataSize[mModel]);
+                        mAnalogInputs[ai].values[axis] = axisPtrOld->analog_in;
+                    }
+                    else {
+                        // For all other controllers
+                        AxisDataNew *axisPtrNew = reinterpret_cast<AxisDataNew *>(gRec.byte_array +
+                                                                                  AxisDataOffset[mModel] +
+                                                                                  galilAxis*AxisDataSize[mModel]);
+                        mAnalogInputs[ai].values[axis] = axisPtrNew->analog_in;
+                    }
+                }
+            }
         }
         else {
             mMotionActive = false;

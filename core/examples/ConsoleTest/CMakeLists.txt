@@ -40,18 +40,25 @@ if (cisst_FOUND_AS_REQUIRED)
     link_directories (${sawGalilController_LIBRARY_DIR})
 
     add_executable (sawGalilConsole main.cpp)
+    add_executable (sawGalilAnalog analog.cpp)
 
     # link with the cisst libraries
     cisst_target_link_libraries (sawGalilConsole ${REQUIRED_CISST_LIBRARIES})
+    cisst_target_link_libraries (sawGalilAnalog ${REQUIRED_CISST_LIBRARIES})
 
     # link with sawGalilController library
     target_link_libraries (sawGalilConsole ${sawGalilController_LIBRARIES})
+    target_link_libraries (sawGalilAnalog ${sawGalilController_LIBRARIES})
 
     set_target_properties (sawGalilConsole PROPERTIES
       COMPONENT sawGalilController-Examples
       FOLDER "sawGalilController")
 
-    install (TARGETS sawGalilConsole
+    set_target_properties (sawGalilAnalog PROPERTIES
+      COMPONENT sawGalilController-Examples
+      FOLDER "sawGalilController")
+
+    install (TARGETS sawGalilAnalog
       COMPONENT sawGalilController-Examples
       RUNTIME DESTINATION bin
       LIBRARY DESTINATION lib
