@@ -21,4 +21,4 @@ Most of the source code is in the [core](./core) subdirectory to facilitate buil
 
 You will first need to download the Galil libraries from https://www.galil.com/downloads/api.  Instructions to install the *gclib* can be found following: *Downloads* ➡ *Software* ➡ *gclib | Galil APIs*.  On Linux, you will need sudo privileges to install the software.
 
-If you're using ROS (1 or 2), the simplest way to download and compile this repository and all the dependencies is to use *vcs*: https://github.com/jhu-saw/vcs
+If you are using ROS (1 or 2), the simplest way to download and compile this repository and all the dependencies is to use *vcs*: https://github.com/jhu-saw/vcs

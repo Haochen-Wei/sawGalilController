@@ -100,7 +100,7 @@ class {
 }
 
 class {
-    name axis;
+    name robot_axis;
     namespace sawGalilControllerConfig;
     attribute CISST_EXPORT;
     member {
@@ -139,6 +139,61 @@ class {
 }
 
 class {
+    name analog_axis;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name index;
+        type size_t;
+        visibility public;
+    }
+    member {
+        name volts_to_SI;
+        type sawGalilControllerConfig::linear_function;
+        visibility public;
+        default sawGalilControllerConfig::linear_function();
+    }
+}
+
+class {
+    name robots;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name name;
+        type std::string;
+        visibility public;
+    }
+    member {
+        name axes;
+        type std::vector<sawGalilControllerConfig::robot_axis>;
+        visibility public;
+    }
+}
+
+class {
+    name analog_inputs;
+    namespace sawGalilControllerConfig;
+    attribute CISST_EXPORT;
+    member {
+        name name;
+        type std::string;
+        visibility public;
+    }
+    member {
+        name command_name;
+        type std::string;
+        visibility public;
+        default std::string("GetAnalogInput");
+    }
+    member {
+        name axes;
+        type std::vector<sawGalilControllerConfig::analog_axis>;
+        visibility public;
+    }
+}
+
+class {
     name controller;
     namespace sawGalilControllerConfig;
     attribute CISST_EXPORT;
@@ -146,11 +201,6 @@ class {
     member {
         name file_version;
         type int;
-        visibility public;
-    }
-    member {
-        name name;
-        type std::string;
         visibility public;
     }
     member {
@@ -184,8 +234,14 @@ class {
         visibility public;
     }
     member {
-        name axes;
-        type std::vector<sawGalilControllerConfig::axis>;
+        name robots;
+        type std::vector<sawGalilControllerConfig::robots>;
         visibility public;
+    }
+    member {
+        name analog_inputs;
+        type std::vector<sawGalilControllerConfig::analog_inputs>;
+        visibility public;
+        default std::vector<sawGalilControllerConfig::analog_inputs>();
     }
 }

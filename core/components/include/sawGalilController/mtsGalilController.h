@@ -42,6 +42,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <string>
 #include <cstdint>
 
+#include <cisstCommon/cmnPath.h>
 #include <cisstVector/vctDynamicVectorTypes.h>
 #include <cisstMultiTask/mtsTaskContinuous.h>
 #include <cisstMultiTask/mtsInterfaceProvided.h>
@@ -83,6 +84,9 @@ protected:
     void         *mGalil;                   // Gcon
     sawGalilControllerConfig::controller m_configuration;
 
+    // Path to configuration files
+    cmnPath mConfigPath;
+
     unsigned int  mModel;                   // Galil model
     unsigned int  mNumAxes;                 // Number of axes
     unsigned int  mGalilIndexMax;           // Maximum galil index
@@ -90,6 +94,7 @@ protected:
     uint16_t      mSampleNum;               // Sample number from controller
     uint8_t       mErrorCode;               // Error code from controller
     uint32_t      mAmpStatus;               // Amplifier status
+
     prmConfigurationJoint m_config_j;       // Joint configuration
     prmStateJoint m_measured_js;            // Measured joint state (CRTK)
     prmStateJoint m_setpoint_js;            // Setpoint joint state (CRTK)
@@ -105,8 +110,11 @@ protected:
     vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
     bool          mLimitSwitchActiveLow;    // Limit switches are active low (true) or active high (false)
     bool          mHomeSwitchInverted;      // Home switch reading is inverted
+    vctBoolVec    mHomingMask;              // Mask for use in homing routines
+    bool          mHomeCustom;              // True if custom home needed
     vctUShortVec  mAxisStatus;              // Axis status
     vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
+    vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed
     vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
     vctUShortVec  mAnalogIn;                // Axis analog input
     bool          mMotorPowerOn;            // Whether motor power is on (for all configured motors)
@@ -118,7 +126,10 @@ protected:
     vctDoubleVec  mDecelDefault;            // Default decel
     vctDoubleVec  mDecel;                   // Current decel
     unsigned int  mState;                   // Internal state machine
+    unsigned int  mTimeout;                 // Timeout
     mtsInterfaceProvided *mInterface;       // Provided interface
+
+    mtsFunctionWrite operating_state;       // Event generator
 
     // String of configured axes (e.g., "ABC")
     char mGalilAxes[GALIL_MAX_AXES+1];
@@ -126,6 +137,12 @@ protected:
     char mGalilQuery[2*GALIL_MAX_AXES];
     // Boolean array indicating which Galil indexes are valid
     bool mGalilIndexValid[GALIL_MAX_AXES];
+
+    struct AnalogInputData {
+        std::string name;
+        mtsDoubleVec values;
+    };
+    std::vector<AnalogInputData> AnalogInputs;
 
     char *mBuffer;                          // Local buffer for building command strings
 
@@ -161,6 +178,10 @@ protected:
     const bool *GetGalilIndexValid(const vctBoolVec &mask) const;
     // Local method to create axes string for specified array of valid Galil indices
     const char *GetGalilAxes(const bool *galilIndexValid) const;
+    // Local method to set outMask based on inMask, clearing any entries that correspond to absolute encoders.
+    // The method returns false if the inMask is not the correct length (same length as outMask), if the robot
+    // is currently homing, or if none of the elements in outMask are true.
+    bool CheckHomingMask(const char *cmdName, const vctBoolVec &inMask, vctBoolVec &outMask) const;
 
     void Init();
     void Close();
