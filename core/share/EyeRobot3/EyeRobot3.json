@@ -2,11 +2,14 @@
 // position_bits_to_SI.offset is the offset, in bits
 {
     "file_version": 1,
-    "name": "EyeRobot3.0",
     "IP_address": "192.168.0.158",
     "direct_mode": 1,
     "DMC_file": "EyeRobot3.dmc",             // Was EYE_ROB3_CONFIG_SCRIPT.dmc
-    "axes": [
+    "robots": [
+    {
+        //"name": "EyeRobot3.0",
+        "name": "control",
+        "axes": [
         {
             "index": 0,
             "type": "PRISMATIC",
@@ -14,7 +17,7 @@
                 "scale":  4096000,
                 "offset": 64397387           // 64391387+6000
             },
-	    "is_absolute": 1
+            "is_absolute": 1
         },
         {
             "index": 1,
@@ -23,7 +26,7 @@
                 "scale":  4096000,
                 "offset": 65656013           // 65650013+6000
             },
-	    "is_absolute": 1
+            "is_absolute": 1
         },
         {
             "index": 2,
@@ -32,7 +35,7 @@
                 "scale":  4096000,
                 "offset": 66241792           // 66235792+6000
             },
-	    "is_absolute": 1
+            "is_absolute": 1
         },
         {
             "index": 4,
@@ -41,7 +44,7 @@
                 "scale":  41721.64072584,    // 728.18*180/PI
                 "offset": 123094
             },
-	    "is_absolute": 1
+            "is_absolute": 1
         },
         {
             "index": 5,
@@ -50,7 +53,50 @@
                 "scale":  4096000,
                 "offset": 63548117
             },
-	    "is_absolute": 1
+            "is_absolute": 1
         }
+        ]
+    }
+    ],
+
+    "analog_inputs": [
+    {
+        "name": "force-sensor",
+        "command_name": "GetAnalogInput",
+        "axes": [
+        {
+            "index": 0,
+            "volts_to_SI": {
+                "scale": 1.0,
+                "offset": 0.0
+            }
+        },
+        {
+            "index": 1
+            // "volts_to_SI" defaults to { 1.0, 0.0 }
+        },
+        {
+            "index": 2
+        },
+        {
+            "index": 3
+        },
+        {
+            "index": 4
+        },
+        {
+            "index": 5
+        }
+        ]
+    },
+    {
+        "name": "footpedal",
+        "command_name": "GetFootpedal",
+        "axes": [
+        {
+            "index": 7
+        }
+        ]
+    }
     ]
 }

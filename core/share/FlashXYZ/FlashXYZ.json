@@ -6,11 +6,13 @@
 //    2000 counts/rev * (1/2) rev/mm --> 1000 counts/mm --> 1000000 counts/m
 {
     "file_version": 1,
-    "name": "FlashXYZ",
     "IP_address": "169.254.0.51",
     "direct_mode": 1,
     "DMC_file": "FlashXYZ.dmc",
-    "axes": [
+    "robots": [
+    {
+        "name": "FlashXYZ",
+        "axes": [
         {
             "index": 0,
             "type": "PRISMATIC",
@@ -50,5 +52,7 @@
                 "upper":  0.0254
             }
         }
+        ]
+    }
     ]
 }

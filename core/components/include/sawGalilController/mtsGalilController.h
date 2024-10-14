@@ -93,6 +93,7 @@ protected:
     uint16_t      mSampleNum;               // Sample number from controller
     uint8_t       mErrorCode;               // Error code from controller
     uint32_t      mAmpStatus;               // Amplifier status
+
     prmConfigurationJoint m_config_j;       // Joint configuration
     prmStateJoint m_measured_js;            // Measured joint state (CRTK)
     prmStateJoint m_setpoint_js;            // Setpoint joint state (CRTK)
@@ -135,6 +136,12 @@ protected:
     char mGalilQuery[2*GALIL_MAX_AXES];
     // Boolean array indicating which Galil indexes are valid
     bool mGalilIndexValid[GALIL_MAX_AXES];
+
+    struct AnalogInputData {
+        std::string name;
+        mtsDoubleVec values;
+    };
+    std::vector<AnalogInputData> AnalogInputs;
 
     char *mBuffer;                          // Local buffer for building command strings
 

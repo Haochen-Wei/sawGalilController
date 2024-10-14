@@ -199,7 +199,7 @@ void mtsGalilController::SetupInterfaces(void)
     StateTable.AddData(mAccel, "accel");
     StateTable.AddData(mDecel, "decel");
 
-    mInterface = AddInterfaceProvided("control");
+    mInterface = AddInterfaceProvided(m_configuration.robots[0].name);
     if (mInterface) {
         // for Status, Warning and Error with mtsMessage
         mInterface->AddMessageEvents();
@@ -315,15 +315,26 @@ void mtsGalilController::Configure(const std::string& fileName)
                                << "Loaded configuration:" << std::endl
                                << m_configuration << std::endl;
     
-    // Size of array determines number of axes
-    mNumAxes = static_cast<unsigned int>(m_configuration.axes.size());
-    CMN_LOG_CLASS_INIT_VERBOSE << "Configure: found " << mNumAxes << " axes" << std::endl;
-
     mModel = GetModelIndex(m_configuration.model);
     if (mModel < NUM_MODELS) {
         CMN_LOG_CLASS_INIT_VERBOSE << "Configure: setting Galil model to " << m_configuration.model
                                    << " (index = " << mModel << ")" << std::endl;
     }
+
+    if (m_configuration.robots.size() < 1) {
+        // For now, this is an error, but could be changed to a warning if we are only using
+        // analog inputs
+        CMN_LOG_CLASS_INIT_ERROR << "Configure: no robots specified!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    else if (m_configuration.robots.size() > 1) {
+        // Handle multiple robots in future
+        CMN_LOG_CLASS_INIT_WARNING << "Configure: only using first robot of " << m_configuration.robots.size() << std::endl;
+    }
+
+    // Size of array determines number of axes
+    mNumAxes = static_cast<unsigned int>(m_configuration.robots[0].axes.size());
+    CMN_LOG_CLASS_INIT_VERBOSE << "Configure: found " << mNumAxes << " axes" << std::endl;
 
     // Now, set the data sizes
     m_config_j.Name().SetSize(mNumAxes);
@@ -377,7 +388,7 @@ void mtsGalilController::Configure(const std::string& fileName)
         mGalilIndexValid[i] = false;
 
     for (unsigned int axis = 0; axis < mNumAxes; axis++) {
-        sawGalilControllerConfig::axis &axisData = m_configuration.axes[axis];
+        sawGalilControllerConfig::robot_axis &axisData = m_configuration.robots[0].axes[axis];
         mGalilIndexValid[axisData.index] = true;
         mAxisToGalilIndexMap[axis] = static_cast<unsigned int>(axisData.index);
         mGalilIndexToAxisMap[axisData.index] = axis;
@@ -854,7 +865,8 @@ bool mtsGalilController::QueryCmdValues(const char *cmd, const char *query, vctI
         for (size_t i = 0; i < data.size(); i++) {
             long value;
             if (sscanf(p, "%ld%n", &value, &nChars) != 1) {
-                mInterface->SendError(this->GetName() + " QueryCmdValues failed for " + recvBuffer);
+                mInterface->SendError(this->GetName() + ": QueryCmdValues failed for [" + sendBuffer
+                                      + "], received [" + recvBuffer + "]");
                 return false;
             }
             data[i] = value;
