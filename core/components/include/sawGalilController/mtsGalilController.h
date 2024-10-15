@@ -140,6 +140,7 @@ protected:
 
     struct AnalogInputData {
         mtsDoubleVec  values;
+        mtsDoubleVec  bits2volts;              // Conversion from bits to volts (depends on AQ setting)
         vctUIntVec    AxisToGalilIndexMap;     // Map from axis number to Galil index
         vctUIntVec    GalilIndexToAxisMap;     // Map from Galil index to axis number
         mtsInterfaceProvided *mInterface;      // Provided interface

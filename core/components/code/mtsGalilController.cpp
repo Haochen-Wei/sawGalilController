@@ -454,12 +454,15 @@ void mtsGalilController::Configure(const std::string& fileName)
     for (size_t i = 0; i < m_configuration.analog_inputs.size(); i++) {
         size_t numAxes = m_configuration.analog_inputs[i].axes.size();
         mAnalogInputs[i].values.SetSize(numAxes);
+        mAnalogInputs[i].values.SetAll(0.0);
+        mAnalogInputs[i].bits2volts.SetSize(numAxes);
+        mAnalogInputs[i].bits2volts.SetAll(1.0);   // default (may be changed in Startup)
         mAnalogInputs[i].AxisToGalilIndexMap.SetSize(numAxes);
         mAnalogInputs[i].GalilIndexToAxisMap.SetSize(GALIL_MAX_AXES);
         for (size_t axis = 0; axis < numAxes; axis++) {
             sawGalilControllerConfig::analog_axis &axisData = m_configuration.analog_inputs[i].axes[axis];
             mAnalogInputs[i].AxisToGalilIndexMap[axis] = static_cast<unsigned int>(axisData.index);
-            mAnalogInputs[i].GalilIndexToAxisMap[axisData.index] = axis;
+            mAnalogInputs[i].GalilIndexToAxisMap[axisData.index] = static_cast<unsigned int>(axis);
         }
     }
 
@@ -528,6 +531,42 @@ void mtsGalilController::Startup()
     else if (cn1 != -1.0) {
         CMN_LOG_CLASS_INIT_WARNING << "Startup: failed to parse home switch state (_CN1): "
                                    << cn1 << std::endl;
+    }
+
+    // Check analog input configuration
+    for (size_t i = 0; i < mAnalogInputs.size(); i++) {
+        for (size_t axis = 0; axis < mAnalogInputs[i].values.size(); axis++) {
+            // Query analog scale (set by AQ command)
+            // Following code assumes that DR always returns a full 16-bit value, even if
+            // the hardware contains a 12-bit ADC.
+            char buf[32];
+            sprintf(buf, "MG _AQ%d", mAnalogInputs[i].AxisToGalilIndexMap[axis]);
+            double aq = QueryValueDouble(buf);
+            if (aq == 1) {
+                // -5V to +5V
+                mAnalogInputs[i].bits2volts[axis] = 10.0/65535;
+            }
+            else if (aq == 2) {
+                // -10V to +10V
+                mAnalogInputs[i].bits2volts[axis] = 20.0/65535;
+            }
+            else if (aq == 3) {
+                // 0V to +5V
+                mAnalogInputs[i].bits2volts[axis] = 5.0/65535;
+            }
+            else if (aq == 4) {
+                // 0V to +10V
+                mAnalogInputs[i].bits2volts[axis] = 10.0/65535;
+            }
+            else if (aq < 0) {
+                CMN_LOG_CLASS_INIT_WARNING << "Configure: differential analog input not currently supported (axis "
+                                           << axis << ", " << buf << " = " << aq << ")" << std::endl;
+            }
+            else {
+                CMN_LOG_CLASS_INIT_WARNING << "Configure: invalid AQ setting (axis " << axis
+                                           << ", " << buf << " = " << aq << ")" << std::endl;
+            }
+        }
     }
 
     // Get controller type (^R^V)
@@ -645,7 +684,8 @@ void mtsGalilController::Run()
                     // For DMC 2103 and 1802
                     AxisDataOld *axisPtrOld = reinterpret_cast<AxisDataOld *>(axisPtr);
                     m_setpoint_js.Effort()[i] = (axisPtrOld->torque*9.9982)/32767.0;  // See Galil TT command
-                    mAnalogIn[i] = axisPtrOld->analog_in;
+                    // DMC 1802 does not have analog input
+                    mAnalogIn[i] = (ModelTypes[mModel] == 1802) ? 0 : axisPtrOld->analog_in;
                 }
                 else {
                     // For all other controllers
@@ -720,20 +760,28 @@ void mtsGalilController::Run()
             for (size_t ai = 0; ai < mAnalogInputs.size(); ai++) {
                 for (size_t axis = 0; axis < mAnalogInputs[ai].values.size(); axis++) {
                     unsigned int galilAxis = mAnalogInputs[ai].AxisToGalilIndexMap[axis];
-                    if ((ModelTypes[mModel] == 1802) || (ModelTypes[mModel] == 2103)) {
-                        // For DMC 2103 and 1802
+                    sawGalilControllerConfig::analog_axis &axisConfig = m_configuration.analog_inputs[ai].axes[axis];
+                    int32_t analog_in;
+                    if (ModelTypes[mModel] == 1802) {
+                        // DMC 1802 does not have analog input
+                        analog_in = 0;
+                    }
+                    else if (ModelTypes[mModel] == 2103) {
+                        // For DMC 2103
                         AxisDataOld *axisPtrOld = reinterpret_cast<AxisDataOld *>(gRec.byte_array +
                                                                                   AxisDataOffset[mModel] +
                                                                                   galilAxis*AxisDataSize[mModel]);
-                        mAnalogInputs[ai].values[axis] = axisPtrOld->analog_in;
+                        analog_in = axisPtrOld->analog_in;
                     }
                     else {
                         // For all other controllers
                         AxisDataNew *axisPtrNew = reinterpret_cast<AxisDataNew *>(gRec.byte_array +
                                                                                   AxisDataOffset[mModel] +
                                                                                   galilAxis*AxisDataSize[mModel]);
-                        mAnalogInputs[ai].values[axis] = axisPtrNew->analog_in;
+                        analog_in = axisPtrNew->analog_in;
                     }
+                    mAnalogInputs[ai].values[axis] = (mAnalogInputs[ai].bits2volts[axis]*analog_in
+                                                      - axisConfig.volts_to_SI.offset) / axisConfig.volts_to_SI.scale;
                 }
             }
         }

@@ -99,7 +99,7 @@ public:
             printf("analog: ");
             for (size_t i = 0; i < values.size(); i++)
                 printf("%lf ", values[i]);
-            printf("]\r");
+            printf("\r");
         }
         else {
             printf("Galil not connected\r");

@@ -11,7 +11,7 @@
     "DMC_file": "FlashXYZ.dmc",
     "robots": [
     {
-        "name": "FlashXYZ",
+        "name": "control",
         "axes": [
         {
             "index": 0,
