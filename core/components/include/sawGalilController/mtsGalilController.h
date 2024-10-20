@@ -119,9 +119,10 @@ protected:
         vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
         vctBoolVec    mHomingMask;              // Mask for use in homing routines
         bool          mHomeCustom;              // True if custom home needed
+        vctIntVec     mHomingSpeed;             // Homing speed for slower searches
         vctUShortVec  mAxisStatus;              // Axis status
         vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
-        vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed
+        vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed (not currently used)
         vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
         vctUShortVec  mAnalogIn;                // Axis analog input (raw value)
         bool          mMotorPowerOn;            // Whether motor power is on (for all configured motors)
@@ -235,6 +236,9 @@ protected:
 
     // Whether controller supports the ZA (user data) command
     bool HasUserDataZA() const;
+
+    // Whether controller supports the HV (homing velocity) command
+    bool HasHomingVelocity() const;
 
     // Local static method to write cmd and axes to buffer
     // Parameters:

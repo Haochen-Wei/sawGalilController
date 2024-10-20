@@ -144,10 +144,13 @@ const int AmpStatusOffset[NUM_MODELS]          = {   52,    52,    -1,    -1,   
 const bool _HasLimitDisable[NUM_MODELS]        = { true, true, true, false, false, true };
 // Whether controller supports the ZA (user data) command
 const bool _HasUserDataZA[NUM_MODELS]          = { true, true, true, false, false, true };
+// Whether controller supports the HV (homing velocity) command
+const bool _HasHomingVelocity[NUM_MODELS]      = { true, true, true, false, false, true };
 
 CMN_IMPLEMENT_SERVICES_DERIVED_ONEARG(mtsGalilController, mtsTaskContinuous, mtsStdString)
 
 mtsGalilController::mtsGalilController(const std::string &name) :
+
     mtsTaskContinuous(name, 1024, true), mGalil(0), mHeader(0), mAmpStatus(0)
 {
     Init();
@@ -392,6 +395,7 @@ void mtsGalilController::Configure(const std::string& fileName)
         mRobots[i].mHomeLimitDisable.SetSize(numAxes);
         mRobots[i].mLimitDisable.SetSize(numAxes);
         mRobots[i].mHomingMask.SetSize(numAxes);
+        mRobots[i].mHomingSpeed.SetSize(numAxes);
         mRobots[i].mAxisStatus.SetSize(numAxes);
         mRobots[i].mStopCode.SetSize(numAxes);
         mRobots[i].mStopCodeChange.SetSize(numAxes);
@@ -872,6 +876,12 @@ bool mtsGalilController::HasUserDataZA() const
     return _HasUserDataZA[mModel];
 }
 
+// Whether controller supports the HV (homing velocity) command
+bool mtsGalilController::HasHomingVelocity() const
+{
+    return _HasHomingVelocity[mModel];
+}
+
 // Returns command, followed by list of axes (e.g., "BG ABC")
 char *mtsGalilController::WriteCmdAxes(char *buf, const char *cmd, const char *axes)
 {
@@ -1282,6 +1292,26 @@ void mtsGalilController::RobotData::Home(const vctBoolVec &mask)
     }
 
     try {
+        // TODO: Set homing speed (in SI units) via JSON file
+        if (mParent->HasHomingVelocity()) {
+            // Newer controllers support the HV command
+            mHomingSpeed.SetAll(500);
+            if (!galil_cmd_common("SetHomingSpeed", "HV ", mHomingSpeed))
+                mInterface->SendWarning(name + ": unable to set HV");
+        }
+        else {
+            // For older controllers, must set JG just before calling FI,
+            // when doing a custom homing sequence (mHomeCustom).
+            // Home switch 1 means that robot homes in negative direction,
+            // so we set mHomingSpeed positive.
+            // NOTE: this assumes that robot is not at home position.
+            for (size_t axis = 0; axis < mNumAxes; axis++) {
+                if (mSwitches[axis] & SwitchHome)
+                    mHomingSpeed[axis] = 500;
+                else
+                    mHomingSpeed[axis] = -500;
+            }
+        }
         if (mHomeCustom) {
             // If this controller does not support LD (limit disable) and any axis
             // is homing at a limit, we need to do a custom home sequence because
@@ -1445,28 +1475,32 @@ void mtsGalilController::RobotData::RunStateMachine()
             break;
 
         case ST_HOMING_FI:
-            try {
-                // Set speed for FI command
-                sprintf(mBuffer, "JG%c=-500", galilChan);  // PK TEMP
-                mParent->SendCommand(mBuffer);
-                // Issue the FI (FindIndex) command on that axis
-                sprintf(mBuffer,"FI %c", galilChan);
-                mParent->SendCommand(mBuffer);
-                // Start the motion
-                sprintf(mBuffer, "BG %c", galilChan);
-                mParent->SendCommand(mBuffer);
-                mState[axis] = ST_HOMING_END;
-            }
-            catch (const std::runtime_error &e) {
-                mInterface->SendError(name + ": " + e.what());
-                mState[axis] = ST_IDLE;
+            // Wait for axis to stop moving before issuing JG and FI commands
+            if (!(mAxisStatus[axis] & StatusMotorMoving)) {
+                try {
+                    // Set speed for FI command
+                    sprintf(mBuffer, "JG%c=%ld", galilChan, mHomingSpeed[axis]);
+                    mParent->SendCommand(mBuffer);
+                    // Issue the FI (FindIndex) command on that axis
+                    sprintf(mBuffer,"FI %c", galilChan);
+                    mParent->SendCommand(mBuffer);
+                    // Start the motion
+                    sprintf(mBuffer, "BG %c", galilChan);
+                    mParent->SendCommand(mBuffer);
+                    mState[axis] = ST_HOMING_END;
+                }
+                catch (const std::runtime_error &e) {
+                    mInterface->SendError(name + ": " + e.what());
+                    // Restore original speed
+                    SetSpeed(mSpeed);
+                    mState[axis] = ST_IDLE;
+                }
             }
             break;
 
         case ST_HOMING_END:
             if (mStopCode[axis] == SC_Homing) {
                 mState[axis] = ST_IDLE;
-                mActuatorState.IsHomed()[axis] = true;
                 // Compute home position in encoder counts
                 int32_t hpos = static_cast<int32_t>(std::round(mHomePos[axis]*mEncoderCountsPerUnit[axis]))
                                + mEncoderOffset[axis];
@@ -1474,6 +1508,11 @@ void mtsGalilController::RobotData::RunStateMachine()
                     // Set home position for specified channel
                     sprintf(mBuffer, "DP%c=%ld", galilChan, hpos);
                     mParent->SendCommand(mBuffer);
+                    if (mParent->HasUserDataZA()) {
+                        sprintf(mBuffer, "ZA%c=1", galilChan);
+                        mParent->SendCommand(mBuffer);
+                    }
+                    mActuatorState.IsHomed()[axis] = true;
                 }
                 catch (const std::runtime_error &e) {
                     mInterface->SendError(name + ": " + e.what());
@@ -1483,13 +1522,12 @@ void mtsGalilController::RobotData::RunStateMachine()
                 sprintf(buf, ": finished homing on axis %d", static_cast<int>(axis));
                 mInterface->SendStatus(name + buf);
             }
-            else if (mStopCode[axis] != SC_Running) {
-                if (mStopCodeChange[axis]) {
-                    sprintf(buf, ": found stop code %d when homing axis %d", mStopCode[axis], static_cast<int>(axis));
-                    mInterface->SendStatus(name + buf);
-                    // TODO: abort homing this axis if stopped due to an error
-                    mState[axis] = ST_IDLE;
-                }
+            else if (!((mStopCode[axis] == SC_Running) || (mStopCode[axis] == SC_FindEdge))) {
+                sprintf(buf, ": found stop code %d when homing axis %d", mStopCode[axis], static_cast<int>(axis));
+                mInterface->SendStatus(name + buf);
+                // Restore original speed
+                SetSpeed(mSpeed);
+                mState[axis] = ST_IDLE;
             }
             // Now, check if all axes are homed (ST_IDLE)
             if (!mState.Any()) {
