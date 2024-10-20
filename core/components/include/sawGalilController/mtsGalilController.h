@@ -87,56 +87,137 @@ protected:
     // Path to configuration files
     cmnPath mConfigPath;
 
+    // Data for the Galil controller (not specific to robot or analog input)
     unsigned int  mModel;                   // Galil model
-    unsigned int  mNumAxes;                 // Number of axes
-    unsigned int  mGalilIndexMax;           // Maximum galil index
     uint32_t      mHeader;                  // Header bytes in DR packet
     uint16_t      mSampleNum;               // Sample number from controller
     uint8_t       mErrorCode;               // Error code from controller
     uint32_t      mAmpStatus;               // Amplifier status
-
-    prmConfigurationJoint m_config_j;       // Joint configuration
-    prmStateJoint m_measured_js;            // Measured joint state (CRTK)
-    prmStateJoint m_setpoint_js;            // Setpoint joint state (CRTK)
-    prmOperatingState m_op_state;           // Operating state (CRTK)
-    prmActuatorState mActuatorState;        // Actuator state
-    vctUIntVec    mAxisToGalilIndexMap;     // Map from axis number to Galil index
-    vctUIntVec    mGalilIndexToAxisMap;     // Map from Galil index to axis number
-    vctDoubleVec  mEncoderCountsPerUnit;    // Encoder conversion factors
-    vctLongVec    mEncoderOffset;           // Encoder offset (counts or bits)
-    vctBoolVec    mEncoderAbsolute;         // True if absolute encoder (false if incremental)
-    vctDoubleVec  mHomePos;                 // Encoder home positions (offsets)
-    vctIntVec     mHomeLimitDisable;        // Limit switch disable during homing
-    vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
     bool          mLimitSwitchActiveLow;    // Limit switches are active low (true) or active high (false)
     bool          mHomeSwitchInverted;      // Home switch reading is inverted
-    vctBoolVec    mHomingMask;              // Mask for use in homing routines
-    bool          mHomeCustom;              // True if custom home needed
-    vctUShortVec  mAxisStatus;              // Axis status
-    vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
-    vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed
-    vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
-    vctUShortVec  mAnalogIn;                // Axis analog input
-    bool          mMotorPowerOn;            // Whether motor power is on (for all configured motors)
-    bool          mMotionActive;            // Whether a motion is active
-    vctDoubleVec  mSpeedDefault;            // Default speed
-    vctDoubleVec  mSpeed;                   // Current speed
-    vctDoubleVec  mAccelDefault;            // Default accel
-    vctDoubleVec  mAccel;                   // Current accel
-    vctDoubleVec  mDecelDefault;            // Default decel
-    vctDoubleVec  mDecel;                   // Current decel
-    unsigned int  mState;                   // Internal state machine
-    unsigned int  mTimeout;                 // Timeout
-    mtsInterfaceProvided *mInterface;       // Provided interface
 
-    mtsFunctionWrite operating_state;       // Event generator
+    // Structure for robot data
+    struct RobotData {
+        std::string   name;                     // Robot name (from config file)
+        unsigned int  mNumAxes;                 // Number of axes
+        unsigned int  mGalilIndexMax;           // Maximum galil index
+        prmConfigurationJoint m_config_j;       // Joint configuration
+        prmStateJoint m_measured_js;            // Measured joint state (CRTK)
+        prmStateJoint m_setpoint_js;            // Setpoint joint state (CRTK)
+        prmOperatingState m_op_state;           // Operating state (CRTK)
+        prmOperatingState::StateType newState;
+        prmActuatorState mActuatorState;        // Actuator state
+        vctUIntVec    mAxisToGalilIndexMap;     // Map from axis number to Galil index
+        vctUIntVec    mGalilIndexToAxisMap;     // Map from Galil index to axis number
 
-    // String of configured axes (e.g., "ABC")
-    char mGalilAxes[GALIL_MAX_AXES+1];
-    // String for querying (e.g., "?,?,?")
-    char mGalilQuery[2*GALIL_MAX_AXES];
-    // Boolean array indicating which Galil indexes are valid
-    bool mGalilIndexValid[GALIL_MAX_AXES];
+        vctDoubleVec  mEncoderCountsPerUnit;    // Encoder conversion factors
+        vctLongVec    mEncoderOffset;           // Encoder offset (counts or bits)
+        vctBoolVec    mEncoderAbsolute;         // True if absolute encoder (false if incremental)
+        vctDoubleVec  mHomePos;                 // Encoder home positions (offsets)
+
+        vctIntVec     mHomeLimitDisable;        // Limit switch disable during homing
+        vctIntVec     mLimitDisable;            // Current setting of limit disable (LD)
+        vctBoolVec    mHomingMask;              // Mask for use in homing routines
+        bool          mHomeCustom;              // True if custom home needed
+        vctUShortVec  mAxisStatus;              // Axis status
+        vctUCharVec   mStopCode;                // Axis stop code (see Galil SC command)
+        vctBoolVec    mStopCodeChange;          // Whether axis stop code just changed
+        vctUCharVec   mSwitches;                // Axis switches (see Galil TS command)
+        vctUShortVec  mAnalogIn;                // Axis analog input (raw value)
+        bool          mMotorPowerOn;            // Whether motor power is on (for all configured motors)
+        bool          mMotionActive;            // Whether a motion is active
+        vctDoubleVec  mSpeedDefault;            // Default speed
+        vctDoubleVec  mSpeed;                   // Current speed
+        vctDoubleVec  mAccelDefault;            // Default accel
+        vctDoubleVec  mAccel;                   // Current accel
+        vctDoubleVec  mDecelDefault;            // Default decel
+        vctDoubleVec  mDecel;                   // Current decel
+        vctUIntVec    mState;                   // Internal axis state machine
+        unsigned int  mTimeout;                 // Timeout
+        mtsInterfaceProvided *mInterface;       // Provided interface
+        mtsFunctionWrite operating_state;       // Event generator
+
+        // String of configured axes (e.g., "ABC")
+        char mGalilAxes[GALIL_MAX_AXES+1];
+        // String for querying (e.g., "?,?,?")
+        char mGalilQuery[2*GALIL_MAX_AXES];
+        // Boolean array indicating which Galil indexes are valid
+        bool mGalilIndexValid[GALIL_MAX_AXES];
+
+        mtsGalilController *mParent;            // Pointer to parent object
+        char *mBuffer;                          // Local buffer for building command strings
+
+        RobotData();
+        ~RobotData();
+
+        void GetNumAxes(unsigned int &numAxes) const { numAxes = mNumAxes; }
+
+        // Move joint to specified position
+        void servo_jp(const prmPositionJointSet &jtpos);
+        // Move joint to specified relative position
+        void servo_jr(const prmPositionJointSet &jtpos);
+        // Move joint at specified velocity
+        void servo_jv(const prmVelocityJointSet &jtvel);
+        // Hold joint at current position (Stop)
+        void hold(void);
+
+        // Get joint configuration
+        void GetConfig_js(prmConfigurationJoint &cfg_j) const
+        { cfg_j = m_config_j; }
+
+        // TEMP: following is to be able to use prmStateRobotQtWidgetComponent
+        void measured_cp(prmPositionCartesianGet &pos) const
+        { pos = prmPositionCartesianGet(); }
+
+        // Enable motor power
+        void EnableMotorPower(void);
+        // Disable motor power
+        void DisableMotorPower(void);
+
+        // Set speed, acceleration and deceleration
+        void SetSpeed(const vctDoubleVec &spd);
+        void SetAccel(const vctDoubleVec &accel);
+        void SetDecel(const vctDoubleVec &decel);
+
+        // Home: mask indicates which axes to home
+        void Home(const vctBoolVec &mask);
+        void UnHome(const vctBoolVec &mask);
+
+        // FindEdge: move specified axes until transition on home input
+        void FindEdge(const vctBoolVec &mask);
+        // FindIndex: move specified axes until index pulse detected, will set
+        // axis position to 0 when done
+        void FindIndex(const vctBoolVec &mask);
+
+        // Set absolute position (e.g., for homing); also sets home flag
+        // (using ZA) on Galil controller
+        void SetHomePosition(const vctDoubleVec &pos);
+
+        // Common methods for sending command to Galil
+        bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctDoubleVec &goal,
+                              bool useOffset);
+        bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctIntVec &data);
+
+        // Local method to stop robot if it is moving
+        void stop_if_active(const char *cmd);
+
+        // Local method to create boolean array from vctBoolVec, also remapping from robot axis to Galil index
+        const bool *GetGalilIndexValid(const vctBoolVec &mask) const;
+        // Local method to create axes string for specified array of valid Galil indices
+        const char *GetGalilAxes(const bool *galilIndexValid) const;
+        // Local method to set outMask based on inMask, clearing any entries that correspond to absolute encoders.
+        // The method returns false if the inMask is not the correct length (same length as outMask), if the robot
+        // is currently homing, or if none of the elements in outMask are true.
+        bool CheckHomingMask(const char *cmdName, const vctBoolVec &inMask, vctBoolVec &outMask) const;
+
+        // Local method to set operating state to fault
+        void SetFault();
+        // Local method to update operating state and set event if it changed
+        void UpdateOperatingState();
+        // Local method called from component Run loop
+        void RunStateMachine();
+    };
+    std::vector<RobotData> mRobots;
 
     struct AnalogInputData {
         mtsDoubleVec  values;
@@ -149,6 +230,12 @@ protected:
 
     char *mBuffer;                          // Local buffer for building command strings
 
+    // Whether controller supports the LD (limit disable) command
+    bool HasLimitDisable() const;
+
+    // Whether controller supports the ZA (user data) command
+    bool HasUserDataZA() const;
+
     // Local static method to write cmd and axes to buffer
     // Parameters:
     //    buf    Buffer for output
@@ -156,12 +243,6 @@ protected:
     //    axes   Galil axes string (e.g., "ABC")
     // Example output: "BG ABC"
     static char *WriteCmdAxes(char *buf, const char *cmd, const char *axes);
-
-    // Local method to write a query command (e.g., "LD ?,?,?") and parse the result
-    //    cmd    Galil command string to use for query, include space if desired (e.g., "LD ")
-    //    query  Query string (e.g., "?,?,?" or "?,,?")
-    //    data   Vector for storing result of query
-    bool QueryCmdValues(const char *cmd, const char *query, vctIntVec &data) const;
 
     // Local static method to create cmd followed by comma-separated values
     // Parameters:
@@ -173,18 +254,15 @@ protected:
     // Example output: "SP 1000,,500"
     static char *WriteCmdValues(char *buf, const char *cmd, const int32_t *data, const bool *valid, unsigned int num);
 
+    // Local method to write a query command (e.g., "LD ?,?,?") and parse the result
+    //    cmd    Galil command string to use for query, include space if desired (e.g., "LD ")
+    //    query  Query string (e.g., "?,?,?" or "?,,?")
+    //    data   Vector for storing result of query
+    bool QueryCmdValues(const char *cmd, const char *query, vctIntVec &data) const;
+
     // Local methods to parse returned value
     int QueryValueInt(const char *cmd);
     double QueryValueDouble(const char *cmd);
-
-    // Local method to create boolean array from vctBoolVec, also remapping from robot axis to Galil index
-    const bool *GetGalilIndexValid(const vctBoolVec &mask) const;
-    // Local method to create axes string for specified array of valid Galil indices
-    const char *GetGalilAxes(const bool *galilIndexValid) const;
-    // Local method to set outMask based on inMask, clearing any entries that correspond to absolute encoders.
-    // The method returns false if the inMask is not the correct length (same length as outMask), if the robot
-    // is currently homing, or if none of the elements in outMask are true.
-    bool CheckHomingMask(const char *cmdName, const vctBoolVec &inMask, vctBoolVec &outMask) const;
 
     void Init();
     void Close();
@@ -193,62 +271,15 @@ protected:
 
     void SetupInterfaces();
 
-    void GetNumAxes(unsigned int &numAxes) const { numAxes = mNumAxes; }
     void GetHeader(uint32_t &header) const { header = mHeader; }
     void GetConnected(bool &val) const { val = (mGalil != 0); }
 
     void SendCommand(const std::string& cmdString);
     void SendCommandRet(const std::string& cmdString, std::string &retString);
 
-    // Enable motor power
-    void EnableMotorPower(void);
-    // Disable motor power
-    void DisableMotorPower(void);
-
     // Abort robot command
     void AbortProgram();
     void AbortMotion();
-
-    // Common methods for sending command to Galil
-    bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctDoubleVec &goal,
-                          bool useOffset);
-    bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctIntVec &data);
-
-    // Move joint to specified position
-    void servo_jp(const prmPositionJointSet &jtpos);
-    // Move joint to specified relative position
-    void servo_jr(const prmPositionJointSet &jtpos);
-    // Move joint at specified velocity
-    void servo_jv(const prmVelocityJointSet &jtvel);
-    // Hold joint at current position (Stop)
-    void hold(void);
-
-    // Get joint configuration
-    void GetConfig_js(prmConfigurationJoint &cfg_j) const
-    { cfg_j = m_config_j; }
-
-    // TEMP: following is to be able to use prmStateRobotQtWidgetComponent
-    void measured_cp(prmPositionCartesianGet &pos) const
-    { pos = prmPositionCartesianGet(); }
-
-    // Set speed, acceleration and deceleration
-    void SetSpeed(const vctDoubleVec &spd);
-    void SetAccel(const vctDoubleVec &accel);
-    void SetDecel(const vctDoubleVec &decel);
-
-    // Home: mask indicates which axes to home
-    void Home(const vctBoolVec &mask);
-    void UnHome(const vctBoolVec &mask);
-
-    // FindEdge: move specified axes until transition on home input
-    void FindEdge(const vctBoolVec &mask);
-    // FindIndex: move specified axes until index pulse detected, will set
-    // axis position to 0 when done
-    void FindIndex(const vctBoolVec &mask);
-
-    // Set absolute position (e.g., for homing); also sets home flag
-    // (using ZA) on Galil controller
-    void SetHomePosition(const vctDoubleVec &pos);
 };
 
 CMN_DECLARE_SERVICES_INSTANTIATION(mtsGalilController)
