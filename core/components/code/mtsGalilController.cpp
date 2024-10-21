@@ -803,8 +803,8 @@ void mtsGalilController::Run()
                     unsigned int galilAxis = mAnalogInputs[i].AxisToGalilIndexMap[axis];
                     sawGalilControllerConfig::analog_axis &axisConfig = m_configuration.analog_inputs[i].axes[axis];
                     union {
-                        int32_t sval;
-                        uint32_t uval;
+                        int16_t sval;
+                        uint16_t uval;
                     } analog_in;
                     if (ModelTypes[mModel] == 1802) {
                         // DMC 1802 does not have analog input
