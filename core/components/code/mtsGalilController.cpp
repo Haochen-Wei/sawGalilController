@@ -474,6 +474,8 @@ void mtsGalilController::Configure(const std::string& fileName)
         mAnalogInputs[i].values.SetAll(0.0);
         mAnalogInputs[i].bits2volts.SetSize(numAxes);
         mAnalogInputs[i].bits2volts.SetAll(1.0);   // default (may be changed in Startup)
+        mAnalogInputs[i].isSigned.SetSize(numAxes);
+        mAnalogInputs[i].isSigned.SetAll(true);    // default (may be changed in Startup)
         mAnalogInputs[i].AxisToGalilIndexMap.SetSize(numAxes);
         mAnalogInputs[i].GalilIndexToAxisMap.SetSize(GALIL_MAX_AXES);
         for (size_t axis = 0; axis < numAxes; axis++) {
@@ -564,18 +566,22 @@ void mtsGalilController::Startup()
             if (aq == 1) {
                 // -5V to +5V
                 mAnalogInputs[i].bits2volts[axis] = 10.0/65535;
+                mAnalogInputs[i].isSigned[axis] = true;
             }
             else if (aq == 2) {
                 // -10V to +10V
                 mAnalogInputs[i].bits2volts[axis] = 20.0/65535;
+                mAnalogInputs[i].isSigned[axis] = true;
             }
             else if (aq == 3) {
                 // 0V to +5V
                 mAnalogInputs[i].bits2volts[axis] = 5.0/65535;
+                mAnalogInputs[i].isSigned[axis] = false;
             }
             else if (aq == 4) {
                 // 0V to +10V
                 mAnalogInputs[i].bits2volts[axis] = 10.0/65535;
+                mAnalogInputs[i].isSigned[axis] = false;
             }
             else if (aq < 0) {
                 CMN_LOG_CLASS_INIT_WARNING << "Configure: differential analog input not currently supported (axis "
@@ -796,26 +802,34 @@ void mtsGalilController::Run()
                 for (axis = 0; axis < mAnalogInputs[i].values.size(); axis++) {
                     unsigned int galilAxis = mAnalogInputs[i].AxisToGalilIndexMap[axis];
                     sawGalilControllerConfig::analog_axis &axisConfig = m_configuration.analog_inputs[i].axes[axis];
-                    int32_t analog_in;
+                    union {
+                        int32_t sval;
+                        uint32_t uval;
+                    } analog_in;
                     if (ModelTypes[mModel] == 1802) {
                         // DMC 1802 does not have analog input
-                        analog_in = 0;
+                        analog_in.uval = 0;
                     }
                     else if (ModelTypes[mModel] == 2103) {
                         // For DMC 2103
                         AxisDataOld *axisPtrOld = reinterpret_cast<AxisDataOld *>(gRec.byte_array +
                                                                                   AxisDataOffset[mModel] +
                                                                                   galilAxis*AxisDataSize[mModel]);
-                        analog_in = axisPtrOld->analog_in;
+                        analog_in.uval = axisPtrOld->analog_in;
                     }
                     else {
                         // For all other controllers
                         AxisDataNew *axisPtrNew = reinterpret_cast<AxisDataNew *>(gRec.byte_array +
                                                                                   AxisDataOffset[mModel] +
                                                                                   galilAxis*AxisDataSize[mModel]);
-                        analog_in = axisPtrNew->analog_in;
+                        analog_in.uval = axisPtrNew->analog_in;
                     }
-                    mAnalogInputs[i].values[axis] = (mAnalogInputs[i].bits2volts[axis]*analog_in
+                    double analog_in_d;
+                    if (mAnalogInputs[i].isSigned[axis])
+                        analog_in_d = analog_in.sval;
+                    else
+                        analog_in_d = analog_in.uval;
+                    mAnalogInputs[i].values[axis] = (mAnalogInputs[i].bits2volts[axis]*analog_in_d
                                                       - axisConfig.volts_to_SI.offset) / axisConfig.volts_to_SI.scale;
                 }
             }
