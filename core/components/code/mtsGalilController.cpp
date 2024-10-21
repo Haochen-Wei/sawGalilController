@@ -698,7 +698,6 @@ void mtsGalilController::Run()
                 bool isAllMotorOn = true;
                 bool isAllMotorOff = true;
                 for (axis = 0; axis < mRobots[i].mNumAxes; axis++) {
-                    sawGalilControllerConfig::robot_axis &axisConfig = m_configuration.robots[i].axes[axis];
                     unsigned int galilAxis = mRobots[i].mAxisToGalilIndexMap[axis];
                     AxisDataMin *axisPtr = reinterpret_cast<AxisDataMin *>(gRec.byte_array +
                                                                            AxisDataOffset[mModel] +
@@ -943,8 +942,9 @@ int mtsGalilController::QueryValueInt(const char *cmd)
 {
     int value = 0;
     GReturn ret = GCmdI(mGalil, cmd, &value);
-    if (ret != G_NO_ERROR)
+    if (ret != G_NO_ERROR) {
         CMN_LOG_CLASS_RUN_ERROR << this->GetName() << " QueryValueInt failed for " << cmd << std::endl;
+    }
     return value;
 }
 
@@ -953,8 +953,9 @@ double mtsGalilController::QueryValueDouble(const char *cmd)
 {
     double value = 0.0;
     GReturn ret = GCmdD(mGalil, cmd, &value);
-    if (ret != G_NO_ERROR)
+    if (ret != G_NO_ERROR) {
         CMN_LOG_CLASS_RUN_ERROR << this->GetName() << " QueryValueDouble failed for " << cmd << std::endl;
+    }
     return value;
 }
 
@@ -1479,7 +1480,7 @@ void mtsGalilController::RobotData::RunStateMachine()
             if (!(mAxisStatus[axis] & StatusMotorMoving)) {
                 try {
                     // Set speed for FI command
-                    sprintf(mBuffer, "JG%c=%ld", galilChan, mHomingSpeed[axis]);
+                    sprintf(mBuffer, "JG%c=%d", galilChan, mHomingSpeed[axis]);
                     mParent->SendCommand(mBuffer);
                     // Issue the FI (FindIndex) command on that axis
                     sprintf(mBuffer,"FI %c", galilChan);
@@ -1506,7 +1507,7 @@ void mtsGalilController::RobotData::RunStateMachine()
                                + mEncoderOffset[axis];
                 try {
                     // Set home position for specified channel
-                    sprintf(mBuffer, "DP%c=%ld", galilChan, hpos);
+                    sprintf(mBuffer, "DP%c=%d", galilChan, hpos);
                     mParent->SendCommand(mBuffer);
                     if (mParent->HasUserDataZA()) {
                         sprintf(mBuffer, "ZA%c=1", galilChan);
