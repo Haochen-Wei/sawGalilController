@@ -166,6 +166,9 @@ protected:
         void GetConfig_js(prmConfigurationJoint &cfg_j) const
         { cfg_j = m_config_j; }
 
+        // Set operating state
+        void state_command(const std::string &command);
+
         // TEMP: following is to be able to use prmStateRobotQtWidgetComponent
         void measured_cp(prmPositionCartesianGet &pos) const
         { pos = prmPositionCartesianGet(); }
@@ -198,6 +201,9 @@ protected:
         bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctDoubleVec &goal,
                               bool useOffset);
         bool galil_cmd_common(const char *cmdName, const char *cmdGalil, const vctIntVec &data);
+
+        // Local method to check if robot is in ENABLED state
+        bool CheckStateEnabled(const char *cmdName) const;
 
         // Local method to stop robot if it is moving
         void stop_if_active(const char *cmd);

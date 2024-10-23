@@ -218,6 +218,7 @@ void mtsGalilController::SetupInterfaces(void)
             prov->AddCommandWrite(&mtsGalilController::RobotData::servo_jv, &mRobots[i], "servo_jv");
             prov->AddCommandVoid(&mtsGalilController::RobotData::hold, &mRobots[i], "hold");
             prov->AddCommandRead(&mtsGalilController::RobotData::GetConfig_js, &mRobots[i], "configuration_js");
+            prov->AddCommandWrite(&mtsGalilController::RobotData::state_command, &mRobots[i], "state_command", std::string(""));
             prov->AddEventWrite(mRobots[i].operating_state, "operating_state", prmOperatingState());
 
             prov->AddCommandVoid(&mtsGalilController::RobotData::EnableMotorPower, &mRobots[i], "EnableMotorPower");
@@ -793,7 +794,13 @@ void mtsGalilController::Run()
                 }
                 mRobots[i].mMotionActive = isAnyMoving;
                 mRobots[i].mMotorPowerOn = isAllMotorOn;
-                mRobots[i].newState = mRobots[i].mMotorPowerOn ? prmOperatingState::ENABLED : prmOperatingState::DISABLED;
+                // Set new state to DISABLED if motor power is off, and to ENABLED if motor
+                // power is on and we are not in the PAUSED state. The client must send the
+                // "resume" state command to transition out of the PAUSED state.
+                if (!mRobots[i].mMotorPowerOn)
+                    mRobots[i].newState = prmOperatingState::DISABLED;
+                else if (mRobots[i].m_op_state.State() != prmOperatingState::PAUSED)
+                    mRobots[i].newState = prmOperatingState::ENABLED;
                 mRobots[i].m_op_state.SetIsBusy(mRobots[i].mMotionActive);
             }
 
@@ -1060,12 +1067,69 @@ void mtsGalilController::RobotData::DisableMotorPower(void)
     }
 }
 
+void mtsGalilController::RobotData::state_command(const std::string &command)
+{
+    std::string humanReadableMessage;
+    prmOperatingState::StateType newOperatingState;
+    try {
+        if (m_op_state.ValidCommand(prmOperatingState::CommandTypeFromString(command),
+                                    newOperatingState, humanReadableMessage)) {
+            if (command == "enable") {
+                EnableMotorPower();
+                return;
+            }
+            if (command == "disable") {
+                DisableMotorPower();
+                return;
+            }
+            if (command == "home") {
+                vctBoolVec homingMask(mNumAxes, true);
+                Home(homingMask);
+                return;
+            }
+            if (command == "unhome") {
+                vctBoolVec homingMask(mNumAxes, true);
+                UnHome(homingMask);
+                return;
+            }
+            if (command == "pause") {
+                if (m_op_state.State() == prmOperatingState::ENABLED)
+                    hold();   // Stop motion
+                m_op_state.SetState(newOperatingState);
+                return;
+            }
+            if (command == "resume") {
+                m_op_state.SetState(newOperatingState);
+                return;
+            }
+        } else {
+            mInterface->SendWarning(name + ": " + humanReadableMessage);
+        }
+    } catch (std::runtime_error &e) {
+        mInterface->SendWarning(name + ": " + command + " doesn't seem to be a valid state_command (" + e.what() + ")");
+    }
+}
+
+bool mtsGalilController::RobotData::CheckStateEnabled(const char *cmdName) const
+{
+    if (m_op_state.State() != prmOperatingState::ENABLED) {
+        try {
+            mInterface->SendWarning(name + ": " + cmdName + ": robot not enabled, current state is "
+                                    + prmOperatingState::StateTypeToString(m_op_state.State()));
+        }
+        catch (const std::runtime_error &e) {
+            mInterface->SendError(name + ": " + cmdName + ": robot not enabled, " + e.what());
+        }
+        return false;
+    }
+    return true;
+}
+
 void mtsGalilController::RobotData::servo_jp(const prmPositionJointSet &jtpos)
 {
-    if (!mMotorPowerOn) {
-        mInterface->SendError("servo_jp: motor power is off");
+    if (!CheckStateEnabled("servo_jp"))
         return;
-    }
+
     stop_if_active("servo_jp");
     try {
         if (galil_cmd_common("servo_jp", "PA ", jtpos.Goal(), true))
@@ -1078,10 +1142,9 @@ void mtsGalilController::RobotData::servo_jp(const prmPositionJointSet &jtpos)
 
 void mtsGalilController::RobotData::servo_jr(const prmPositionJointSet &jtpos)
 {
-    if (!mMotorPowerOn) {
-        mInterface->SendError("servo_jr: motor power is off");
+    if (!CheckStateEnabled("servo_jr"))
         return;
-    }
+
     stop_if_active("servo_jr");
     try {
         if (galil_cmd_common("servo_jr", "PR ", jtpos.Goal(), false))
@@ -1094,10 +1157,9 @@ void mtsGalilController::RobotData::servo_jr(const prmPositionJointSet &jtpos)
 
 void mtsGalilController::RobotData::servo_jv(const prmVelocityJointSet &jtvel)
 {
-    if (!mMotorPowerOn) {
-        mInterface->SendError("servo_jv: motor power is off");
+    if (!CheckStateEnabled("servo_jv"))
         return;
-    }
+
     try {
         // TODO: Only need to send BG after the first JG command
         // Note that JG actually updates SP on the Galil, but for now we do not update
@@ -1112,10 +1174,9 @@ void mtsGalilController::RobotData::servo_jv(const prmVelocityJointSet &jtvel)
 
 void mtsGalilController::RobotData::hold(void)
 {
-    if (!mMotorPowerOn) {
-        mInterface->SendError("hold: motor power is off");
+    if (!CheckStateEnabled("hold"))
         return;
-    }
+
     try {
         mParent->SendCommand(WriteCmdAxes(mBuffer, "ST ", mGalilAxes));
         // TEMP: set speed in case previous command was servo_jv
