@@ -104,6 +104,12 @@ class {
     namespace sawGalilControllerConfig;
     attribute CISST_EXPORT;
     member {
+        name name;
+        type std::string;
+        visibility public;
+        default std::string("");
+    }
+    member {
         name index;
         type size_t;
         visibility public;

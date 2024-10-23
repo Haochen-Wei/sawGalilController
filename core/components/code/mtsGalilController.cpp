@@ -427,9 +427,12 @@ void mtsGalilController::Configure(const std::string& fileName)
             // Save largest Galil index for future efficiency
             if (mRobots[i].mAxisToGalilIndexMap[axis] > mRobots[i].mGalilIndexMax)
                 mRobots[i].mGalilIndexMax = mRobots[i].mAxisToGalilIndexMap[axis];
-            mRobots[i].m_measured_js.Name()[axis].assign(1, galilChannel);
-            mRobots[i].m_setpoint_js.Name()[axis].assign(1, galilChannel);
-            mRobots[i].m_config_j.Name()[axis].assign(1, galilChannel);
+            // If axis name is empty, assign the Galil channel (e.g., "A", "B", ...)
+            if (axisData.name.empty())
+                axisData.name.assign(1, galilChannel);
+            mRobots[i].m_measured_js.Name()[axis].assign(axisData.name);
+            mRobots[i].m_setpoint_js.Name()[axis].assign(axisData.name);
+            mRobots[i].m_config_j.Name()[axis].assign(axisData.name);
             mRobots[i].m_config_j.Type()[axis] = static_cast<cmnJointType>(axisData.type);
             mRobots[i].m_config_j.PositionMin()[axis] = axisData.position_limits.lower;
             mRobots[i].m_config_j.PositionMax()[axis] = axisData.position_limits.upper;

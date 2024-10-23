@@ -20,6 +20,7 @@ The JSON file contains the following fields:
 | robots        |           | Array of robot configuration data (see below)         |
 |  - name       |           |  - robot name (used for provided interface)           |
 |  - axes       |           |  - array of robot axis configuration data (see below) |
+|  -- name      | ""        |  -- name of axis (if empty, will use Galil channel letter) |
 |  -- index     |           |  -- channel index on Galil controller (typically 0-7} |
 |  -- type      |           |  -- prismatic (1) or revolute (2)                     |
 |  -- position_bits_to_SI | |  -- conversion scale and offset (*)                   |
