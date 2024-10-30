@@ -25,6 +25,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <cisstMultiTask/mtsManagerLocal.h>
 #include <cisstMultiTask/mtsTaskContinuous.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
+#include <FTSensorConfig.h>
 
 #include <sawGalilController/mtsGalilController.h>
 
@@ -36,6 +37,7 @@ private:
     mtsDoubleVec values;
     mtsFunctionRead GetConnected;
     mtsFunctionRead get_analog;
+    mtsDoubleVec ForceTorque;
 
     void OnStatusEvent(const mtsMessage &msg) {
         std::cout << std::endl << "Status: " << msg.Message << std::endl;
@@ -72,6 +74,13 @@ public:
     void Startup()
     {
         PrintHelp();
+        FTCalibration cal;
+        if(!cal.ParseFTCalibrationFile("FTCalibration.xml", cal.data))
+        {   
+            std::cout << "Failed to parse calibration file" << std::endl;
+        }
+        ForceTorque.SetSize(6);
+        ForceTorque.SetAll(0.0);
     }
 
     void Run() {
@@ -96,9 +105,14 @@ public:
 
         if (galilOK) {
             get_analog(values);
+            cal.Voltage2FT(values, ForceTorque);
             printf("analog: ");
             for (size_t i = 0; i < values.size(); i++)
                 printf("%lf ", values[i]);
+            printf("\r");
+            printf("FT: ");
+            for (size_t i = 0; i < ForceTorque.size(); i++)
+                printf("%lf ", ForceTorque[i]);
             printf("\r");
         }
         else {

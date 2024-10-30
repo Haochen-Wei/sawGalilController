@@ -40,7 +40,7 @@ if (cisst_FOUND_AS_REQUIRED)
     link_directories (${sawGalilController_LIBRARY_DIR})
 
     add_executable (sawGalilConsole main.cpp)
-    add_executable (sawGalilAnalog analog.cpp)
+    add_executable (sawGalilAnalog analog.cpp FTSensorConfig.cpp)
 
     # link with the cisst libraries
     cisst_target_link_libraries (sawGalilConsole ${REQUIRED_CISST_LIBRARIES})
