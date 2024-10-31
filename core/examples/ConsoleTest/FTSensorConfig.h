@@ -2,16 +2,17 @@
 #include <string>
 #include <sstream>
 
-class FTCalibration: public cmnGenericObject
+class FTCalibration//: public cmnGenericObject
 {
-    CMN_DECLARE_SERVICES(CMN_DYNAMIC_CREATION, CMN_LOG_LOD_RUN_ERROR);
+    // CMN_DECLARE_SERVICES(CMN_DYNAMIC_CREATION, CMN_LOG_LOD_RUN_ERROR);
 
 public:
 	FTCalibration();
-	~FTCalibration();
+
+	virtual ~FTCalibration();
 	
 	//This function parses the ATI FT calibration file and fills the FTSensorCalibration structure, returning true on success.
-	bool ParseFTCalibrationFile(const std::string &filename, std::vector<FTSensorData> &data);
+	bool ParseFTCalibrationFile(const std::string &filename,bool UserA);
 
 	//This function converts the voltage readings from the sensor to force/torque readings using the calibration data.
 	bool Voltage2FT(const vctDoubleVec voltage, vctDoubleVec &ft);
@@ -55,7 +56,6 @@ private:
 	} Calibration;
 	
 	Calibration m_Calibration;
-	bool Calibrated = false;                        // whether or not the sensor is calibrated
-}
+	bool Calibrated;
 
-
+};

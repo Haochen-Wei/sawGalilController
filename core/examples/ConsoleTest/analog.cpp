@@ -25,7 +25,7 @@ http://www.cisst.org/cisst/license.txt.
 #include <cisstMultiTask/mtsManagerLocal.h>
 #include <cisstMultiTask/mtsTaskContinuous.h>
 #include <cisstMultiTask/mtsInterfaceRequired.h>
-#include <FTSensorConfig.h>
+#include "FTSensorConfig.h"
 
 #include <sawGalilController/mtsGalilController.h>
 
@@ -38,6 +38,7 @@ private:
     mtsFunctionRead GetConnected;
     mtsFunctionRead get_analog;
     mtsDoubleVec ForceTorque;
+    FTCalibration cal;
 
     void OnStatusEvent(const mtsMessage &msg) {
         std::cout << std::endl << "Status: " << msg.Message << std::endl;
@@ -74,8 +75,8 @@ public:
     void Startup()
     {
         PrintHelp();
-        FTCalibration cal;
-        if(!cal.ParseFTCalibrationFile("FTCalibration.xml", cal.data))
+        cal=FTCalibration();
+        if(!cal.ParseFTCalibrationFile("FT47864.cal",true))
         {   
             std::cout << "Failed to parse calibration file" << std::endl;
         }
@@ -109,7 +110,7 @@ public:
             printf("analog: ");
             for (size_t i = 0; i < values.size(); i++)
                 printf("%lf ", values[i]);
-            printf("\r");
+            // printf("\n");
             printf("FT: ");
             for (size_t i = 0; i < ForceTorque.size(); i++)
                 printf("%lf ", ForceTorque[i]);
@@ -133,7 +134,6 @@ int main(int argc, char **argv)
     cmnLogger::SetMaskFunction(CMN_LOG_ALLOW_ALL);
     // Using SendStatus, SendWarning and SendError instead
     // cmnLogger::AddChannel(std::cout, CMN_LOG_ALLOW_ERRORS_AND_WARNINGS);
-
     if (argc < 3) {
         std::cout << "Syntax: sawGalilAnalog <config> <interface>" << std::endl;
         std::cout << "        <config>      Configuration file (JSON format)" << std::endl;

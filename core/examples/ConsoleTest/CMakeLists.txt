@@ -18,7 +18,8 @@ set (REQUIRED_CISST_LIBRARIES
   cisstVector
   cisstOSAbstraction
   cisstMultiTask
-  cisstParameterTypes)
+  cisstParameterTypes
+  cisstCommonXML)
 
 # find cisst and make sure the required libraries have been compiled
 find_package (cisst 1.2 COMPONENTS ${REQUIRED_CISST_LIBRARIES})
