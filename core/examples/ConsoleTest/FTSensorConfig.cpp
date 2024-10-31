@@ -4,6 +4,8 @@
 #include <cisstCommon/cmnUnits.h>
 #include <cisstOSAbstraction.h>
 
+CMN_IMPLEMENT_SERVICES(FTCalibration);
+
 FTCalibration::FTCalibration(){
     Calibration m_Calibration;
 	Calibrated = false;                        // whether or not the sensor is calibrated

@@ -2,9 +2,9 @@
 #include <string>
 #include <sstream>
 
-class FTCalibration//: public cmnGenericObject
+class FTCalibration: public cmnGenericObject
 {
-    // CMN_DECLARE_SERVICES(CMN_DYNAMIC_CREATION, CMN_LOG_LOD_RUN_ERROR);
+    CMN_DECLARE_SERVICES(CMN_DYNAMIC_CREATION, CMN_LOG_LOD_RUN_ERROR);
 
 public:
 	FTCalibration();
@@ -59,3 +59,4 @@ private:
 	bool Calibrated;
 
 };
+CMN_DECLARE_SERVICES_INSTANTIATION(FTCalibration);
