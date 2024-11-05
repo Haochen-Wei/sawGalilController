@@ -17,6 +17,9 @@ public:
 	//This function converts the voltage readings from the sensor to force/torque readings using the calibration data.
 	bool Voltage2FT(const vctDoubleVec voltage, vctDoubleVec &ft);
 
+	void Bias(const vctDoubleVec voltage);
+	void Unbias();
+
 private:
 	typedef struct FTSensorCalibration{
 		// basic FT information
@@ -55,6 +58,8 @@ private:
 		
 	} Calibration;
 	
+	// bias term and calibration flag
+	vctDoubleVec BiasVolt;                          // bias voltage.
 	Calibration m_Calibration;
 	bool Calibrated;
 

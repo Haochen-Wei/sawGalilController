@@ -69,7 +69,7 @@ public:
     void PrintHelp()
     {
         std::cout << "Available commands:" << std::endl
-                  << "  q: quit" << std::endl;
+                  << "  q: quit, b: bias, u:unbias" << std::endl;
     }
 
     void Startup()
@@ -100,10 +100,18 @@ public:
                 std::cout << std::endl << "Exiting.. " << std::endl;
                 this->Kill();
                 break;
-
+            case 'b':   // bias the term
+                std::cout << std::endl << "Bias.. " << std::endl;
+                cal.Bias(values);
+                break;
+            case 'u':   // quit program
+                std::cout << std::endl << "UnBias.. " << std::endl;
+                cal.Unbias();
+                break;
             }
         }
-
+        
+        
         if (galilOK) {
             get_analog(values);
             cal.Voltage2FT(values, ForceTorque);

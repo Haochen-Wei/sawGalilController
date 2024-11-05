@@ -7,7 +7,6 @@
 CMN_IMPLEMENT_SERVICES(FTCalibration);
 
 FTCalibration::FTCalibration(){
-    Calibration m_Calibration;
 	Calibrated = false;                        // whether or not the sensor is calibrated
 }
 
@@ -105,6 +104,8 @@ bool FTCalibration::ParseFTCalibrationFile(const std::string &file, bool UserAxi
     }
     
     Calibrated = true;
+    BiasVolt.SetSize(m_Calibration.NumGages);
+    BiasVolt.SetAll(0);
     
     return true;
 }
@@ -118,6 +119,16 @@ bool FTCalibration::Voltage2FT(const vctDoubleVec voltage, vctDoubleVec &ft) {
     if(!Calibrated){
         return false;
     }
-    ft = m_Calibration.BasicMatrix * voltage;
+    ft = m_Calibration.BasicMatrix * (voltage - BiasVolt);
     return true;
+}
+
+void FTCalibration::Bias(const vctDoubleVec voltage) {
+    // Zero the bias of the sensor
+    BiasVolt = voltage;
+}
+
+void FTCalibration::Unbias() {
+    // Set bias of the sensor as 0.
+    BiasVolt.SetAll(0);
 }
